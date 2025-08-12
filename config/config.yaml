@@ -1,0 +1,203 @@
+# AUV GNC Simulation Configuration
+# Based on scaled REMUS-class AUV specifications
+# Units: SI (meters, kg, seconds, radians) unless noted
+
+# Vehicle Geometry and Mass Properties
+vehicle:
+  # Physical dimensions (scaled from REMUS 100/600 class)
+  length: 2.74          # [m] Total vehicle length
+  diameter: 0.30        # [m] Hull diameter (between REMUS-100 0.19m and REMUS-600 0.324m)
+  mass: 90.0            # [kg] Total vehicle mass in water
+  
+  # Center of mass and buoyancy
+  cg_offset_x: 0.0      # [m] CG offset from geometric center (forward positive)
+  cg_offset_z: -0.02    # [m] CG slightly below centerline for stability
+  cb_offset_x: 0.0      # [m] Center of buoyancy offset
+  cb_offset_z: 0.0      # [m] CB at geometric center
+  
+  # Moments of inertia (estimated from cylinder approximation)
+  # I_xx = 0.5 * m * r^2 (roll, small for torpedo shape)
+  # I_yy = I_zz = (1/12) * m * L^2 + (1/4) * m * r^2 (pitch/yaw)
+  I_xx: 1.0             # [kg*m^2] Roll inertia (small, minimal for torpedo)
+  I_yy: 50.8            # [kg*m^2] Pitch inertia
+  I_zz: 50.8            # [kg*m^2] Yaw inertia
+  
+  # Tail arm (distance from CG to fin center of pressure)
+  tail_arm: 1.0         # [m] Lever arm for fin moments
+
+# Hydrodynamic Coefficients
+hydrodynamics:
+  # Surge (forward motion) drag model: F_drag = d1*u + d2*u*|u|
+  d1_surge: 0.0         # [N*s/m] Linear drag coefficient (minimal for streamlined hull)
+  d2_surge: 25.0        # [N*s^2/m^2] Quadratic drag (tuned for ~2.3 m/s top speed)
+  
+  # Added mass coefficients (typical for torpedo-shaped hull)
+  added_mass_surge: 5.0    # [kg] X-direction added mass (~5-10% of vehicle mass)
+  added_mass_sway: 45.0    # [kg] Y-direction added mass (~50% of vehicle mass)
+  added_mass_heave: 45.0   # [kg] Z-direction added mass
+  
+  # Pitch/yaw damping (moment = -c_q * q, -c_r * r)
+  c_pitch_rate: 15.0    # [N*m*s] Pitch rate damping coefficient
+  c_yaw_rate: 15.0      # [N*m*s] Yaw rate damping coefficient
+
+# Fin Control Surfaces (X-tail configuration)
+fins:
+  # Physical properties
+  count: 4              # Number of fins in X-tail configuration
+  area_each: 0.019      # [m^2] Individual fin area (~0.25m span × 0.08m chord)
+  span: 0.25            # [m] Fin span
+  chord: 0.08           # [m] Fin chord length
+  
+  # Dihedral angles for X-tail configuration (±45° from vertical/horizontal)
+  dihedral_angles: [45, -45, 135, -135]  # [deg] Top-right, top-left, bottom-left, bottom-right
+  
+  # Performance limits
+  max_deflection: 25.0  # [deg] Maximum fin deflection
+  max_rate: 120.0       # [deg/s] Maximum fin rate
+  servo_lag: 0.03       # [s] Servo response time constant
+  
+  # Hydrodynamic coefficients (based on NACA-like profiles)
+  # Lift = 0.5 * rho * V^2 * S * CL
+  CL_alpha: 3.0         # [1/rad] Lift coefficient slope vs angle of attack
+  CL_delta: 2.0         # [1/rad] Lift coefficient slope vs fin deflection
+  CD0: 0.02             # [-] Zero-lift drag coefficient
+  CDi_factor: 0.8       # [-] Induced drag factor
+
+# Propulsion System
+propulsion:
+  # Thruster specifications
+  max_thrust: 150.0     # [N] Maximum available thrust
+  max_rpm: 3000         # [rpm] Maximum propeller RPM
+  
+  # Thrust model: T = kt * RPM^2
+  kt_coefficient: 1.67e-5  # [N*s^2] Thrust coefficient (T = kt * RPM^2)
+  
+  # Propeller dynamics
+  thrust_time_constant: 0.15  # [s] First-order thrust response lag
+  deadband_percent: 2.0    # [%] Thrust deadband as percentage of max
+  
+  # Efficiency and power (for future use)
+  prop_efficiency: 0.7     # [-] Propeller efficiency
+  motor_efficiency: 0.9    # [-] Motor efficiency
+
+# Environmental Conditions  
+environment:
+  # Fluid properties (seawater)
+  fluid_density: 1025.0    # [kg/m^3] Seawater density
+  kinematic_viscosity: 1.2e-6  # [m^2/s] Seawater kinematic viscosity
+  
+  # Current conditions
+  current_speed: 0.2       # [m/s] Constant current magnitude
+  current_direction: 0.0   # [deg] Current direction (North=0, East=90)
+  
+  # Operating limits
+  max_depth: 600.0         # [m] Maximum operating depth
+  surface_depth: 0.0       # [m] Surface reference depth
+  
+  # Gravitational acceleration
+  gravity: 9.81            # [m/s^2] Earth gravity
+
+# Sensor Models
+sensors:
+  # Inertial Measurement Unit (IMU)
+  imu:
+    sample_rate: 100.0     # [Hz] IMU sampling frequency
+    gyro_noise_std: 0.02   # [deg/s/√Hz] Gyroscope white noise
+    gyro_bias_std: 0.5     # [deg/s] Gyroscope bias standard deviation
+    gyro_bias_tau: 3600.0  # [s] Gyroscope bias correlation time
+    accel_noise_std: 0.02  # [m/s²/√Hz] Accelerometer white noise
+    accel_bias_std: 0.1    # [m/s²] Accelerometer bias standard deviation
+  
+  # Doppler Velocity Log (DVL)
+  dvl:
+    sample_rate: 10.0      # [Hz] DVL sampling frequency  
+    velocity_noise_std: 0.02  # [m/s] Velocity measurement noise
+    range_limit: 100.0     # [m] Maximum bottom-track range
+    
+  # Depth Sensor (Pressure)
+  depth:
+    sample_rate: 10.0      # [Hz] Depth sensor sampling frequency
+    noise_std: 0.05        # [m] Depth measurement noise
+    resolution: 0.01       # [m] Sensor resolution
+    
+  # Magnetometer (Heading)
+  magnetometer:
+    sample_rate: 10.0      # [Hz] Magnetometer sampling frequency
+    heading_noise_std: 0.5 # [deg] Heading measurement noise
+    declination: 0.0       # [deg] Magnetic declination correction
+    
+  # GPS (Surface only)
+  gps:
+    sample_rate: 1.0       # [Hz] GPS sampling frequency
+    position_noise_std: 3.0  # [m] GPS position noise
+    enabled_at_surface: false  # Enable GPS when at surface
+
+# Control System Parameters
+control:
+  # Simulation timing
+  physics_dt: 0.0025       # [s] Physics integration timestep (400 Hz)
+  control_dt: 0.02         # [s] Control loop timestep (50 Hz)
+  
+  # Speed Controller (PI)
+  speed_controller:
+    kp: 100.0              # [N*s/m] Proportional gain
+    ki: 10.0               # [N/m] Integral gain
+    max_integral: 50.0     # [N] Integral windup limit
+    
+  # Yaw Controller (PID) 
+  yaw_controller:
+    kp: 5.0                # [N*m/rad] Proportional gain
+    ki: 0.5                # [N*m/(rad*s)] Integral gain  
+    kd: 1.0                # [N*m*s/rad] Derivative gain
+    max_integral: 20.0     # [N*m] Integral windup limit
+    
+  # Pitch Controller (PID)
+  pitch_controller:
+    kp: 8.0                # [N*m/rad] Proportional gain
+    ki: 0.8                # [N*m/(rad*s)] Integral gain
+    kd: 1.5                # [N*m*s/rad] Derivative gain  
+    max_integral: 15.0     # [N*m] Integral windup limit
+  
+  # Safety Limits
+  safety:
+    max_pitch_angle: 20.0  # [deg] Maximum pitch angle
+    max_yaw_rate: 30.0     # [deg/s] Maximum yaw rate
+    max_speed: 3.0         # [m/s] Maximum forward speed
+    min_depth: 0.5         # [m] Minimum operating depth
+
+# Guidance Parameters
+guidance:
+  # Line-of-Sight (LOS) guidance
+  los:
+    lookahead_distance: 10.0  # [m] LOS lookahead distance
+    capture_radius: 2.0       # [m] Waypoint capture radius
+    max_cross_track: 10.0     # [m] Maximum cross-track error before correction
+    
+  # Waypoint navigation
+  waypoints:
+    approach_speed: 1.5       # [m/s] Default approach speed
+    loiter_radius: 5.0        # [m] Loiter radius around waypoints
+    path_following_speed: 2.0 # [m/s] Speed during path following
+
+# Simulation Scenarios
+scenarios:
+  # Test scenario parameters
+  test_duration: 300.0       # [s] Default test duration
+  initial_conditions:
+    position: [0.0, 0.0, -5.0]  # [m] Initial X, Y, Z position
+    orientation: [0.0, 0.0, 0.0]  # [deg] Initial roll, pitch, yaw
+    velocity: [0.0, 0.0, 0.0]   # [m/s] Initial body velocities
+    
+  # Logging configuration
+  logging:
+    log_rate: 50.0           # [Hz] Data logging frequency
+    save_plots: true         # Save plots automatically
+    show_live_plots: false   # Show live plotting during simulation
+    log_level: "INFO"        # Logging level (DEBUG, INFO, WARNING, ERROR)
+
+# File paths and output
+paths:
+  results_dir: "results"     # Results directory
+  plots_dir: "results/plots" # Plots directory
+  logs_dir: "results/logs"   # Logs directory
+  config_dir: "config"       # Configuration directory
