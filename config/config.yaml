@@ -193,6 +193,8 @@ scenarios:
     log_rate: 50.0           # [Hz] Data logging frequency
     save_plots: true         # Save plots automatically
     show_live_plots: false   # Show live plotting during simulation
+    live_plot_interval: 0.1  # [s] Live plot update interval
+    live_plot_trail: 500     # Number of points in trajectory trail
     log_level: "INFO"        # Logging level (DEBUG, INFO, WARNING, ERROR)
 
 # File paths and output

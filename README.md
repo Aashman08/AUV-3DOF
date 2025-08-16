@@ -14,6 +14,8 @@ This simulation provides a realistic physics-based model of an AUV with complete
 - **Realistic Actuators**: Propulsion system and X-tail fin configuration
 - **Mission Planning**: Waypoint-based mission execution
 - **Data Logging**: High-frequency data capture with CSV output
+- **Real-time Visualization**: Live 3D trajectory and control monitoring
+- **Automatic Plot Generation**: Comprehensive post-simulation analysis plots
 - **Configurable Parameters**: YAML-based configuration system
 
 ## Repository Structure
@@ -43,6 +45,10 @@ auv_gnc_simulation/
 │   └── plots/                  # Generated plots and visualizations
 ├── tests/                      # Unit tests
 ├── visualization/              # Plotting and visualization tools
+│   ├── plot_results.py        # Post-simulation analysis plots
+│   └── live_plot.py           # Real-time 3D visualization
+├── test_live_plot.py          # Live plotting test utility
+├── generate_plots.py          # Standalone plot generation utility
 └── README.md                   # This file
 ```
 
@@ -68,10 +74,10 @@ The system is configured through `config/config.yaml` which includes:
 2. **Custom Simulation**:
    ```python
    from src.simulation_runner import AUVSimulation
-   from src.io.types import CommandIn
+   from src.data_types.types import CommandIn
    
    # Create simulation
-   sim = AUVSimulation("config/config.yaml")
+   sim = AUVSimulation("config/config.yaml", scenario_name="custom_mission")
    
    # Define mission waypoints
    mission = [
@@ -81,8 +87,20 @@ The system is configured through `config/config.yaml` which includes:
                 desired_pitch=0.0, desired_depth=5.0)
    ]
    
-   # Run simulation
+   # Run simulation with live visualization
    final_state, info = sim.run_scenario(mission, duration=120.0)
+   ```
+
+3. **Live Visualization Test**:
+   ```bash
+   python test_live_plot.py
+   ```
+
+4. **Generate Plots from Existing Data**:
+   ```bash
+   python generate_plots.py                    # Latest results
+   python generate_plots.py --show             # Display plots
+   python generate_plots.py --data results/logs/simulation_data_*.csv
    ```
 
 ## Key Components
@@ -111,6 +129,12 @@ The system is configured through `config/config.yaml` which includes:
 - RPM-thrust relationship modeling
 - Deadband and saturation effects
 - Power consumption estimation
+
+### Visualization System (`visualization/`)
+- **Real-time 3D plotting** (`live_plot.py`): Live trajectory visualization during simulation
+- **Post-simulation analysis** (`plot_results.py`): Comprehensive performance plots
+- **Automatic plot generation**: Configurable via `save_plots` setting
+- **Multiple plot types**: Trajectory, control performance, sensor data, mission summary
 
 ## Data Output
 

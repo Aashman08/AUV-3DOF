@@ -21,7 +21,7 @@ from dataclasses import dataclass
 # Add src to path for imports
 sys.path.append(str(Path(__file__).parent.parent))
 
-from io.types import CommandIn, ActuatorOut, SensorsIn, degrees_to_radians, radians_to_degrees
+from data_types.types import CommandIn, ActuatorOut, SensorsIn, degrees_to_radians, radians_to_degrees
 from utils.logging_config import get_logger
 
 logger = get_logger()

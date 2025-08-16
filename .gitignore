@@ -1,0 +1,11 @@
+/results/
+*.log
+*.log.*
+
+/pycache/
+/results/
+/logs/
+/plots/
+/tmp/
+/__pycache__/
+

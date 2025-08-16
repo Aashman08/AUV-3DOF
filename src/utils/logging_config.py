@@ -165,6 +165,27 @@ class SimulationLogger:
         
         if self._timers:
             self.logger.warning(f"Unclosed timers: {list(self._timers.keys())}")
+    
+    # Standard logging interface methods
+    def debug(self, message: str) -> None:
+        """Log debug message."""
+        self.logger.debug(message)
+    
+    def info(self, message: str) -> None:
+        """Log info message."""
+        self.logger.info(message)
+    
+    def warning(self, message: str) -> None:
+        """Log warning message."""
+        self.logger.warning(message)
+    
+    def error(self, message: str) -> None:
+        """Log error message."""
+        self.logger.error(message)
+    
+    def critical(self, message: str) -> None:
+        """Log critical message."""
+        self.logger.critical(message)
 
 
 class DataLogger:
@@ -307,8 +328,17 @@ def get_logger(name: str = "AUV_GNC") -> SimulationLogger:
     return _global_logger
 
 
-def setup_logging(log_level: str = "INFO", console_output: bool = True) -> SimulationLogger:
-    """Setup global logging configuration."""
+def setup_logging(log_level: str = "INFO", console_output: bool = True, log_dir: Optional[Path] = None) -> SimulationLogger:
+    """Setup global logging configuration.
+
+    Args:
+        log_level: Logging level for the global logger
+        console_output: Whether to enable console output
+        log_dir: Optional directory to write log files to
+    """
     global _global_logger
-    _global_logger = SimulationLogger("AUV_GNC", log_level=log_level, console_output=console_output)
+    if log_dir is None:
+        _global_logger = SimulationLogger("AUV_GNC", log_level=log_level, console_output=console_output)
+    else:
+        _global_logger = SimulationLogger("AUV_GNC", log_dir=Path(log_dir), log_level=log_level, console_output=console_output)
     return _global_logger

@@ -23,7 +23,7 @@ import sys
 # Add src to path for imports
 sys.path.append(str(Path(__file__).parent))
 
-from io.types import VehicleState, EnvironmentState, CommandIn
+from data_types.types import VehicleState, EnvironmentState, CommandIn
 from physics.vehicle_dynamics import VehicleDynamics
 from actuators.propulsion import PropulsionSystem
 from sensors.sensor_models import SensorSuite
@@ -41,20 +41,33 @@ class AUVSimulation:
     - Scenario execution and mission planning
     """
     
-    def __init__(self, config_file: str = "config/config.yaml"):
+    def __init__(self, config_file: str = "config/config.yaml", scenario_name: str = "simulation"):
         """
         Initialize AUV simulation.
         
         Args:
             config_file: Path to YAML configuration file
+            scenario_name: Name of the scenario for output folder naming
         """
         # Load configuration
         self.config = self._load_config(config_file)
         
-        # Setup logging
+        # Prepare per-run directories under results/
+        results_root = Path(self.config['paths']['results_dir'])
+        results_root.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Sanitize scenario name for filesystem use
+        safe_scenario_name = "".join(c for c in scenario_name if c.isalnum() or c in ('_', '-')).rstrip()
+        self.run_id = f"{timestamp}_{safe_scenario_name}"
+        self.run_dir = results_root / self.run_id
+        (self.run_dir / "logs").mkdir(parents=True, exist_ok=True)
+        (self.run_dir / "plots").mkdir(parents=True, exist_ok=True)
+
+        # Setup logging to per-run logs directory
         self.logger = setup_logging(
             log_level=self.config['scenarios']['logging']['log_level'],
-            console_output=True
+            console_output=True,
+            log_dir=self.run_dir / "logs"
         )
         
         # Initialize simulation components
@@ -63,11 +76,14 @@ class AUVSimulation:
         # Initialize state and environment
         self._initialize_simulation_state()
         
-        # Data logging
+        # Data logging under per-run logs directory
         self.data_logger = DataLogger(
-            log_dir=Path(self.config['paths']['logs_dir']),
+            log_dir=self.run_dir / "logs",
             log_rate=self.config['scenarios']['logging']['log_rate']
         )
+        
+        # Live plotting
+        self.live_plotter = self._setup_live_plotter()
         
         # Simulation timing
         self.physics_dt = self.config['control']['physics_dt']    # [s] Physics timestep
@@ -76,6 +92,25 @@ class AUVSimulation:
         self.step_count = 0
         
         self.logger.info("AUV simulation initialized successfully")
+    
+    def _setup_live_plotter(self):
+        """Setup live plotter if enabled."""
+        try:
+            # Import live plotter
+            sys.path.append(str(Path(__file__).parent.parent / "visualization"))
+            from live_plot import create_live_plotter
+            
+            live_plotter = create_live_plotter(self.config)
+            if live_plotter:
+                self.logger.info("Live plotter enabled")
+            else:
+                self.logger.info("Live plotter disabled")
+            
+            return live_plotter
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to setup live plotter: {e}")
+            return None
     
     def _load_config(self, config_file: str) -> Dict[str, Any]:
         """Load configuration from YAML file."""
@@ -154,6 +189,10 @@ class AUVSimulation:
         self.controller.reset()
         self.propulsion.reset()
         
+        # Start live plotter
+        if self.live_plotter:
+            self.live_plotter.start(show_3d=True, show_controls=True)
+        
         # Mission command management
         command_index = 0
         current_command = mission_commands[0] if mission_commands else self._get_default_command()
@@ -219,6 +258,13 @@ class AUVSimulation:
                 current_command, actuator_commands
             )
             
+            # === LIVE PLOTTING ===
+            if self.live_plotter and self.step_count % 10 == 0:  # Update every 10 steps (25ms at 400Hz)
+                self.live_plotter.update_data(
+                    self.current_time, self.vehicle_state, sensor_data,
+                    current_command, actuator_commands
+                )
+            
             # === PROGRESS LOGGING ===
             if self.step_count % 200 == 0:  # Every 0.5 seconds at 400Hz
                 state_summary = self.dynamics.get_state_summary(self.vehicle_state)
@@ -254,7 +300,51 @@ class AUVSimulation:
         # Log performance summary
         self.logger.log_performance_summary()
         
+        # Stop live plotter and save final plot
+        if self.live_plotter:
+            # Save final live plots into per-run plots directory
+            self.live_plotter.save_final_plots(self.run_dir / "plots")
+            self.live_plotter.stop()
+        
+        # Generate plots if requested
+        if self.config['scenarios']['logging'].get('save_plots', True):
+            self._generate_plots()
+        
         return self.vehicle_state, scenario_info
+    
+    def _generate_plots(self):
+        """Generate visualization plots for the completed simulation."""
+        try:
+            # Import plotting module
+            sys.path.append(str(Path(__file__).parent.parent / "visualization"))
+            from plot_results import AUVResultsPlotter
+            
+            # Find the most recent data file (should be from this run)
+            # Look for data files within this run's logs directory
+            logs_dir = self.run_dir / "logs"
+            csv_files = list(logs_dir.glob("simulation_data_*.csv"))
+            if csv_files:
+                latest_csv = max(csv_files, key=lambda p: p.stat().st_mtime)
+                
+                # Find corresponding metadata file
+                timestamp = '_'.join(latest_csv.stem.split('_')[-2:])
+                metadata_file = logs_dir / f"simulation_metadata_{timestamp}.json"
+                
+                # Create plotter and generate plots
+                self.logger.info("Generating visualization plots...")
+                plotter = AUVResultsPlotter(
+                    str(latest_csv), 
+                    str(metadata_file) if metadata_file.exists() else None
+                )
+                plotter.create_all_plots(show=False)
+                self.logger.info(f"Plots saved to: {plotter.output_dir}")
+            else:
+                self.logger.warning("No data files found for plotting")
+                
+        except Exception as e:
+            self.logger.error(f"Failed to generate plots: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
     
     def _get_default_command(self) -> CommandIn:
         """Get default mission command."""
@@ -330,7 +420,7 @@ def run_basic_simulation():
     with a simple mission profile.
     """
     # Create simulation instance
-    sim = AUVSimulation()
+    sim = AUVSimulation(scenario_name="basic_simulation")
     
     # Create simple test mission
     mission = sim.create_simple_mission()

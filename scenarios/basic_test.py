@@ -19,8 +19,8 @@ import numpy as np
 # Add src to path for imports
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
-from src.io.types import CommandIn
-from src.simulation_runner import AUVSimulation
+from data_types.types import CommandIn
+from simulation_runner import AUVSimulation
 
 
 def create_basic_test_mission():
@@ -119,7 +119,7 @@ def run_basic_test():
     
     # Initialize simulation
     print("Initializing AUV simulation...")
-    sim = AUVSimulation("config/config.yaml")
+    sim = AUVSimulation("config/config.yaml", scenario_name="basic_test")
     
     # Create mission waypoints
     print("Creating test mission...")
@@ -209,6 +209,25 @@ def run_basic_test():
     success &= completion_ok
     
     print(f"\nOVERALL RESULT: {'SUCCESS' if success else 'FAILURE'}")
+    
+    # Generate additional plots for analysis
+    print(f"\n" + "="*60)
+    print("GENERATING ADDITIONAL PLOTS")
+    print("="*60)
+    
+    try:
+        # Import plotting module
+        sys.path.append(str(Path(__file__).parent.parent / "visualization"))
+        from plot_results import plot_latest_results
+        
+        # Generate comprehensive plots (search under results/ recursively)
+        plotter = plot_latest_results(results_dir="results", show=False)
+        if plotter:
+            print(f"✓ All plots generated successfully in: {plotter.output_dir}")
+        else:
+            print("✗ Failed to generate plots - no data found")
+    except Exception as e:
+        print(f"✗ Failed to generate additional plots: {e}")
     
     return sim, final_state, sim_info, success
 

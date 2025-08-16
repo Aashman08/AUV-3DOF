@@ -26,7 +26,7 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.append(str(Path(__file__).parent.parent))
 
-from io.types import VehicleState, EnvironmentState
+from data_types.types import VehicleState, EnvironmentState
 from utils.logging_config import get_logger
 
 logger = get_logger()
