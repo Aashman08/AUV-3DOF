@@ -95,10 +95,10 @@ flowchart TB
     A --> GP[generate_plots.py]:::py
     A --> RD[README.md]:::md
 
-    classDef dir fill:#e7f1ff,stroke:#5989d6,stroke-width:1px;
-    classDef py  fill:#e9ffe7,stroke:#5fb760,stroke-width:1px;
-    classDef md  fill:#fff7cc,stroke:#d6b65a,stroke-width:1px;
-    classDef misc fill:#f3f3f3,stroke:#bdbdbd,stroke-width:1px;
+    classDef dir fill:#e7f1ff,stroke:#5989d6,stroke-width:1px,color:#000000;
+    classDef py  fill:#e9ffe7,stroke:#5fb760,stroke-width:1px,color:#000000;
+    classDef md  fill:#fff7cc,stroke:#d6b65a,stroke-width:1px,color:#000000;
+    classDef misc fill:#f3f3f3,stroke:#bdbdbd,stroke-width:1px,color:#000000;
 ```
 
 </details>
