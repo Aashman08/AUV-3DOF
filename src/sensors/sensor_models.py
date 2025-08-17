@@ -256,14 +256,14 @@ class MagnetometerSensor:
         Returns:
             Magnetic heading [deg] (0=North, 90=East)
         """
-        # True heading in degrees
+        # True heading in degrees (already wrapped by vehicle dynamics)
         true_heading = radians_to_degrees(state.orientation[2])  # Yaw angle
         
         # Add magnetic declination and noise
         noise = np.random.normal(0, self.heading_noise_std)
         measured_heading = true_heading + self.declination + noise
         
-        # Wrap to [-180, 180] degrees using robust method
+        # Wrap to [-180, 180] degrees - use same method as vehicle dynamics
         measured_heading_rad = np.deg2rad(measured_heading)
         wrapped_rad = np.arctan2(np.sin(measured_heading_rad), np.cos(measured_heading_rad))
         measured_heading = np.rad2deg(wrapped_rad)

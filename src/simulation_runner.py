@@ -444,7 +444,7 @@ def run_basic_simulation():
     mission = sim.create_simple_mission()
     
     # Run simulation  
-    final_state, info = sim.run_scenario(mission, duration=200.0)
+    final_state, info = sim.run_scenario(mission, duration=400.0)
     
     # Print results
     print("\n" + "="*50)

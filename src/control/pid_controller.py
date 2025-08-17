@@ -284,7 +284,8 @@ class AUVController:
         
         # Heading control
         heading_reference = degrees_to_radians(safe_commands.desired_heading)
-        heading_error = self._wrap_angle(heading_reference - current_heading)
+        # Calculate shortest angular difference (handles ±180° wraparound properly)
+        heading_error = self._angle_difference(heading_reference, current_heading)
         yaw_moment = self.heading_controller.update(
             0.0, -heading_error, dt  # Setpoint=0, error as measurement
         )
@@ -379,6 +380,26 @@ class AUVController:
         """Wrap angle to [-π, π] range with proper handling of edge cases."""
         # Use atan2 for robust angle wrapping
         return np.arctan2(np.sin(angle), np.cos(angle))
+    
+    def _angle_difference(self, target: float, current: float) -> float:
+        """
+        Calculate the shortest angular difference between two angles.
+        
+        This function properly handles the ±180° wraparound by ensuring
+        the error is always in the range [-π, π].
+        
+        Args:
+            target: Target angle [rad]
+            current: Current angle [rad]
+            
+        Returns:
+            Shortest angular difference [rad] (target - current)
+        """
+        # Calculate raw difference
+        diff = target - current
+        
+        # Wrap to [-π, π] to get shortest path
+        return np.arctan2(np.sin(diff), np.cos(diff))
     
     def reset(self):
         """Reset all controllers to initial state."""

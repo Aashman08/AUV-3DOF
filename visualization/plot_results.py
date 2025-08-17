@@ -232,7 +232,7 @@ class AUVResultsPlotter:
         
         # Heading control
         ax = axes[0, 1]
-        ax.plot(time, self.data['yaw'], 'b-', linewidth=2, label='Actual Heading')
+        ax.plot(time, self.data['mag_heading'], 'b-', linewidth=2, label='Actual Heading')
         ax.plot(time, self.data['heading_setpoint'], 'r--', linewidth=2, label='Heading Setpoint')
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Heading [deg]')
@@ -368,7 +368,7 @@ class AUVResultsPlotter:
         # Magnetometer heading
         ax = axes[2, 0]
         ax.plot(time, self.data['mag_heading'], 'b-', linewidth=2, label='Mag Heading')
-        ax.plot(time, self.data['yaw'], 'r--', linewidth=2, label='True Heading')
+        ax.plot(time, self.data['mag_heading'], 'r--', linewidth=2, label='True Heading')
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Heading [deg]')
         ax.set_title('Magnetometer vs True Heading')
@@ -453,7 +453,7 @@ class AUVResultsPlotter:
         
         # Heading profile (middle center)
         ax_heading = fig.add_subplot(gs[1, 1])
-        ax_heading.plot(time, self.data['yaw'], 'b-', linewidth=2, label='Actual')
+        ax_heading.plot(time, self.data['mag_heading'], 'b-', linewidth=2, label='Actual')
         ax_heading.plot(time, self.data['heading_setpoint'], 'r--', linewidth=2, label='Setpoint')
         ax_heading.set_xlabel('Time [s]')
         ax_heading.set_ylabel('Heading [deg]')
@@ -492,7 +492,7 @@ class AUVResultsPlotter:
         Control Performance:
         • Final Depth Error: {abs(-z[-1] - self.data['depth_setpoint'].iloc[-1]):.1f} m
         • Final Speed Error: {abs(self.data['u'].iloc[-1] - self.data['speed_setpoint'].iloc[-1]):.2f} m/s
-        • Final Heading Error: {abs(self.data['yaw'].iloc[-1] - self.data['heading_setpoint'].iloc[-1]):.1f}°
+        • Final Heading Error: {abs(self.data['mag_heading'].iloc[-1] - self.data['heading_setpoint'].iloc[-1]):.1f}°
         """
         
         ax_stats.text(0.05, 0.95, stats_text, transform=ax_stats.transAxes, 
