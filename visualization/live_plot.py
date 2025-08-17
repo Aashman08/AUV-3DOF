@@ -74,7 +74,10 @@ class LiveAUVPlotter:
             'heading_cmd': deque(maxlen=trail_length),
             'pitch_actual': deque(maxlen=trail_length),
             'thrust_actual': deque(maxlen=trail_length),
-            'thrust_cmd': deque(maxlen=trail_length)
+            'thrust_cmd': deque(maxlen=trail_length),
+            'navigation_mode': deque(maxlen=trail_length),
+            'waypoint_index': deque(maxlen=trail_length),
+            'distance_to_waypoint': deque(maxlen=trail_length)
         }
         
         # Matplotlib setup - separate figures for 3D and controls
@@ -138,7 +141,7 @@ class LiveAUVPlotter:
     
     def update_data(self, time: float, vehicle_state: VehicleState, 
                    sensors: SensorsIn, commands: CommandIn, actuators: ActuatorOut,
-                   actual_thrust: float = None):
+                   actual_thrust: float = None, navigation_status: Dict = None):
         """
         Update visualization data and refresh plots if needed.
         
@@ -146,9 +149,10 @@ class LiveAUVPlotter:
             time: Current simulation time
             vehicle_state: Current vehicle state
             sensors: Current sensor measurements
-            commands: Current commands
+            commands: Current commands (these are the ACTUAL commands being executed)
             actuators: Current actuator outputs
             actual_thrust: Actual thrust produced by propulsion system [N]
+            navigation_status: Current navigation status (mode, waypoints, etc.)
         """
         if not self.is_running:
             return
@@ -174,7 +178,23 @@ class LiveAUVPlotter:
         self.control_data['pitch_actual'].append(np.degrees(vehicle_state.orientation[1]))
 
         # Thrust control: commanded vs actual
-        self.control_data['thrust_cmd'].append(actuators.thrust_command)  # What controller commanded
+        self.control_data['thrust_cmd'].append(actuators.thrust_command)
+        
+        # Navigation status data
+        nav_mode = "manual"
+        waypoint_idx = -1
+        dist_to_wp = 0.0
+        
+        if navigation_status:
+            nav_mode = navigation_status.get('navigation_mode', 'manual')
+            if 'navigation_status' in navigation_status:
+                nav_status = navigation_status['navigation_status']
+                waypoint_idx = nav_status.get('current_waypoint_index', -1)
+                dist_to_wp = nav_status.get('distance_to_waypoint', 0.0)
+        
+        self.control_data['navigation_mode'].append(nav_mode)
+        self.control_data['waypoint_index'].append(waypoint_idx)
+        self.control_data['distance_to_waypoint'].append(dist_to_wp)  # What controller commanded
         # Use actual thrust if provided, otherwise fall back to commanded (for backward compatibility)
         thrust_actual_value = actual_thrust if actual_thrust is not None else actuators.thrust_command
         self.control_data['thrust_actual'].append(thrust_actual_value)
@@ -526,8 +546,11 @@ Bounds: X[{x_range[0]:.1f},{x_range[1]:.1f}] Z[{z_range[0]:.1f},{z_range[1]:.1f}
         # Update thrust plot
         self.lines['thrust_actual'].set_data(time, self.control_data['thrust_actual'])
         self.lines['thrust_cmd'].set_data(time, self.control_data['thrust_cmd'])
-        self._auto_scale_axis(self.axes['thrust'], time, 
+        self._auto_scale_axis(self.axes['thrust'], time,
                              [self.control_data['thrust_actual'], self.control_data['thrust_cmd']])
+        
+        # Update navigation status display
+        self._update_navigation_display()
     
     def _auto_scale_axis(self, ax, time_data, y_data_lists):
         """Automatically scale axis limits."""
@@ -549,6 +572,41 @@ Bounds: X[{x_range[0]:.1f},{x_range[1]:.1f}] Z[{z_range[0]:.1f},{z_range[1]:.1f}
             y_range = y_max - y_min
             y_margin = max(0.1, y_range * 0.1)
             ax.set_ylim(y_min - y_margin, y_max + y_margin)
+    
+    def _update_navigation_display(self):
+        """Update navigation status display on control plots."""
+        if len(self.control_data['navigation_mode']) == 0:
+            return
+        
+        # Get current navigation status
+        current_mode = self.control_data['navigation_mode'][-1]
+        current_wp_idx = self.control_data['waypoint_index'][-1]
+        current_dist = self.control_data['distance_to_waypoint'][-1]
+        
+        # Update the title or add text to indicate navigation mode
+        if 'thrust' in self.axes:
+            if current_mode == "waypoint":
+                nav_text = f"Waypoint Navigation: WP{current_wp_idx} ({current_dist:.1f}m)"
+                if current_wp_idx >= 0:
+                    self.axes['thrust'].set_title(f"Thrust Control - {nav_text}")
+                else:
+                    self.axes['thrust'].set_title("Thrust Control - Waypoint Navigation (No Active WP)")
+            else:
+                self.axes['thrust'].set_title("Thrust Control - Manual Commands")
+        
+        # Add navigation context to speed plot as well
+        if 'speed' in self.axes:
+            if current_mode == "waypoint":
+                self.axes['speed'].set_ylabel("Speed [m/s]\n(Waypoint Nav)")
+            else:
+                self.axes['speed'].set_ylabel("Speed [m/s]\n(Manual)")
+        
+        # Add context to heading plot
+        if 'heading' in self.axes:
+            if current_mode == "waypoint":
+                self.axes['heading'].set_ylabel("Heading [deg]\n(Auto-Generated)")
+            else:
+                self.axes['heading'].set_ylabel("Heading [deg]\n(Manual)")
     
     def save_final_plots(self, output_dir: Path):
         """Save final plots to file."""

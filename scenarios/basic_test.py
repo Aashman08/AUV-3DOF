@@ -19,7 +19,7 @@ import numpy as np
 # Add src to path for imports
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
-from data_types.types import CommandIn
+from data_types.types import CommandIn, GeographicWaypoint, GeographicMission
 from simulation_runner import AUVSimulation
 
 
@@ -106,29 +106,133 @@ def create_basic_test_mission():
     return mission_waypoints
 
 
-def run_basic_test():
+def create_basic_waypoint_mission():
+    """
+    Create a basic waypoint mission using geographic coordinates.
+    
+    This demonstrates the new waypoint navigation system alongside
+    the traditional command-based approach.
+    """
+    # Use a location near San Francisco for testing
+    start_lat = 37.7749  # San Francisco latitude
+    start_lon = -122.4194  # San Francisco longitude
+    
+    waypoints = [
+        # Start position
+        GeographicWaypoint(
+            latitude=start_lat,
+            longitude=start_lon,
+            depth=3.0,
+            speed=1.0,
+            tolerance=5.0,
+            loiter_time=5.0,
+            waypoint_id="Start"
+        ),
+        
+        # North 100m
+        GeographicWaypoint(
+            latitude=start_lat + 0.0009,  # ~100m north
+            longitude=start_lon,
+            depth=6.0,
+            speed=1.5,
+            tolerance=5.0,
+            loiter_time=0.0,
+            waypoint_id="North"
+        ),
+        
+        # East 100m  
+        GeographicWaypoint(
+            latitude=start_lat + 0.0009,
+            longitude=start_lon + 0.0011,  # ~100m east
+            depth=10.0,
+            speed=1.5,
+            tolerance=5.0,
+            loiter_time=0.0,
+            waypoint_id="East"
+        ),
+        
+        # South (return)
+        GeographicWaypoint(
+            latitude=start_lat,
+            longitude=start_lon + 0.0011,
+            depth=8.0,
+            speed=1.2,
+            tolerance=5.0,
+            loiter_time=0.0,
+            waypoint_id="South"
+        ),
+        
+        # Return to start
+        GeographicWaypoint(
+            latitude=start_lat,
+            longitude=start_lon,
+            depth=2.0,
+            speed=1.0,
+            tolerance=8.0,
+            loiter_time=10.0,
+            waypoint_id="Return"
+        )
+    ]
+    
+    return GeographicMission(
+        waypoints=waypoints,
+        mission_name="Basic Waypoint Test",
+        origin_lat=start_lat,
+        origin_lon=start_lon,
+        default_speed=1.5
+    )
+
+
+def run_basic_test(use_waypoint_navigation=False):
     """
     Execute the basic test scenario.
+    
+    Args:
+        use_waypoint_navigation: If True, use waypoint navigation instead of manual commands
     
     This function runs the complete test and provides detailed output
     for validation and analysis.
     """
     print("="*60)
-    print("AUV BASIC TEST SCENARIO")
+    nav_mode = "WAYPOINT NAVIGATION" if use_waypoint_navigation else "MANUAL COMMAND"
+    print(f"AUV BASIC TEST SCENARIO ({nav_mode})")
     print("="*60)
     
     # Initialize simulation
     print("Initializing AUV simulation...")
-    sim = AUVSimulation("config/config.yaml", scenario_name="basic_test")
+    scenario_name = "basic_test_waypoint" if use_waypoint_navigation else "basic_test"
+    sim = AUVSimulation("config/config.yaml", scenario_name=scenario_name)
     
-    # Create mission waypoints
-    print("Creating test mission...")
-    mission = create_basic_test_mission()
+    if use_waypoint_navigation:
+        # Create waypoint mission
+        print("Creating waypoint navigation mission...")
+        waypoint_mission = create_basic_waypoint_mission()
+        
+        print(f"Waypoint mission '{waypoint_mission.mission_name}' created:")
+        print(f"Origin: ({waypoint_mission.origin_lat:.6f}, {waypoint_mission.origin_lon:.6f})")
+        for i, wp in enumerate(waypoint_mission.waypoints):
+            print(f"  WP{i}: ({wp.latitude:.6f}, {wp.longitude:.6f}) "
+                  f"depth={wp.depth:.1f}m, speed={wp.speed:.1f}m/s ({wp.waypoint_id})")
+        
+        # Enable waypoint navigation
+        print("Enabling waypoint navigation...")
+        if not sim.enable_waypoint_navigation(waypoint_mission):
+            print("ERROR: Failed to enable waypoint navigation")
+            return None, None, None, False
+        
+        # Use empty manual commands (waypoint navigator controls vehicle)
+        mission = []  # Empty command list
+        
+    else:
+        # Create manual command mission
+        print("Creating manual command mission...")
+        mission = create_basic_test_mission()
     
-    print(f"Mission created with {len(mission)} waypoints:")
-    for i, wp in enumerate(mission):
-        print(f"  {i+1}. t={wp.timestamp:6.1f}s: speed={wp.desired_speed:4.1f}m/s, "
-              f"hdg={wp.desired_heading:6.1f}°, depth={wp.desired_depth:4.1f}m")
+    if not use_waypoint_navigation:
+        print(f"Mission created with {len(mission)} waypoints:")
+        for i, wp in enumerate(mission):
+            print(f"  {i+1}. t={wp.timestamp:6.1f}s: speed={wp.desired_speed:4.1f}m/s, "
+                  f"hdg={wp.desired_heading:6.1f}°, depth={wp.desired_depth:4.1f}m")
     
     # Run simulation
     print(f"\nRunning simulation for {250.0} seconds...")
@@ -160,6 +264,19 @@ def run_basic_test():
     print(f"  Final Depth:      {final_depth:6.2f} m")
     print(f"  Final Heading:    {final_heading:6.1f} deg")
     print(f"  Distance Traveled: {np.linalg.norm(final_state.position[:2]):6.1f} m")
+    
+    # Navigation status (if waypoint navigation was used)
+    if use_waypoint_navigation:
+        control_status = sim.controller.get_status()
+        nav_status = control_status.get('navigation_status', {})
+        if nav_status:
+            print(f"\nWaypoint Navigation Status:")
+            print(f"  Navigation Mode:    {control_status.get('navigation_mode', 'Unknown')}")
+            print(f"  Mission Progress:   {nav_status.get('mission_progress', 'Unknown')}")
+            print(f"  Mission Complete:   {nav_status.get('mission_complete', False)}")
+            print(f"  Current Waypoint:   {nav_status.get('current_waypoint_index', 0)}")
+            print(f"  Distance to Target: {nav_status.get('distance_to_waypoint', 0):.1f} m")
+            print(f"  Total Distance:     {nav_status.get('total_distance_traveled', 0):.1f} m")
     
     # Performance summary
     print(f"\nSimulation Performance:")
@@ -233,6 +350,14 @@ def run_basic_test():
 
 
 if __name__ == "__main__":
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="AUV Basic Test Scenario")
+    parser.add_argument("--waypoint", action="store_true", 
+                       help="Use waypoint navigation instead of manual commands")
+    
+    args = parser.parse_args()
+    
     # Run basic test when executed directly
-    success = run_basic_test()
+    _, _, _, success = run_basic_test(use_waypoint_navigation=args.waypoint)
     sys.exit(0 if success else 1)

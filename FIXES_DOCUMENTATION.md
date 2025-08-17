@@ -328,3 +328,30 @@ After all fixes:
 ✅ **Performance**: Optimized for smooth simulation without unnecessary warnings  
 
 The simulation now provides accurate, stable control performance suitable for AUV guidance and navigation algorithm development.
+
+---
+
+## New Capability: Geographic Waypoint Navigation
+
+As part of recent enhancements, the system now supports autonomous navigation using geographic waypoints.
+
+- Added `src/navigation/waypoint_navigator.py` implementing:
+  - Lat/Lon to local NED conversion for missions
+  - Waypoint sequencing with tolerance and loiter support
+  - Guidance generation for heading/speed/depth
+  - Status reporting for mission progress
+
+- Added `src/navigation/mission_planner.py` utilities to generate missions:
+  - Grid search patterns
+  - Perimeter surveys
+  - Simple waypoint routes
+
+- New scenarios:
+  - `scenarios/basic_test.py --waypoint` to run the basic mission using the navigator
+  - `scenarios/waypoint_navigation_test.py` with `--mission simple|grid|perimeter|all`
+
+- Configuration updates (see `config/config.yaml`):
+  - `navigation`: look-ahead distance, waypoint switch distance, speed limits
+  - `guidance.los`: lookahead distance, capture radius, cross-track constraints
+
+These additions are backward compatible. If waypoint navigation is enabled, the navigator takes control and manual command lists should be empty; otherwise, the simulation behaves as before.

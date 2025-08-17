@@ -25,8 +25,8 @@ auv_gnc_simulation/
 ├── config/
 │   └── config.yaml              # Main configuration file
 ├── src/
-│   ├── io/
-│   │   └── types.py            # Data structures and I/O types
+│   ├── data_types/
+│   │   └── types.py            # Core data structures and helpers
 │   ├── physics/
 │   │   └── vehicle_dynamics.py # 3-DOF vehicle physics model
 │   ├── actuators/
@@ -35,11 +35,15 @@ auv_gnc_simulation/
 │   │   └── sensor_models.py    # Complete sensor suite models
 │   ├── control/
 │   │   └── pid_controller.py   # PID controllers and control allocation
+│   ├── navigation/
+│   │   ├── mission_planner.py  # Mission generation (grid/perimeter/etc.)
+│   │   └── waypoint_navigator.py # Geographic waypoint navigation
 │   ├── utils/
 │   │   └── logging_config.py   # Logging and data capture
 │   └── simulation_runner.py    # Main simulation runner
 ├── scenarios/
-│   └── basic_test.py           # Basic validation scenario
+│   ├── basic_test.py           # Basic validation scenario (manual or waypoint mode)
+│   └── waypoint_navigation_test.py # Dedicated waypoint navigation scenarios
 ├── results/
 │   ├── logs/                   # Simulation data logs
 │   └── plots/                  # Generated plots and visualizations
@@ -62,6 +66,8 @@ The system is configured through `config/config.yaml` which includes:
 - **Sensors**: Noise models, sampling rates, accuracy
 - **Control**: PID gains, safety limits, timing
 - **Environment**: Water properties, currents, operating limits
+- **Guidance/Navigation**: LOS and waypoint parameters, acceptance radii
+- **Scenarios/Logging**: Duration, log rate, live plotting controls
 
 ## Quick Start
 
@@ -71,7 +77,23 @@ The system is configured through `config/config.yaml` which includes:
    python scenarios/basic_test.py
    ```
 
-2. **Custom Simulation**:
+2. **Run Basic Test with Waypoint Navigation**:
+   ```bash
+   python scenarios/basic_test.py --waypoint
+   ```
+
+3. **Run Waypoint Navigation Scenarios**:
+   ```bash
+   # Simple, Grid Search, or Perimeter missions
+   python scenarios/waypoint_navigation_test.py --mission simple
+   python scenarios/waypoint_navigation_test.py --mission grid
+   python scenarios/waypoint_navigation_test.py --mission perimeter
+
+   # Or run all
+   python scenarios/waypoint_navigation_test.py --mission all
+   ```
+
+4. **Custom Simulation**:
    ```python
    from src.simulation_runner import AUVSimulation
    from src.data_types.types import CommandIn
@@ -91,12 +113,12 @@ The system is configured through `config/config.yaml` which includes:
    final_state, info = sim.run_scenario(mission, duration=120.0)
    ```
 
-3. **Live Visualization Test**:
+5. **Live Visualization Test**:
    ```bash
    python test_live_plot.py
    ```
 
-4. **Generate Plots from Existing Data**:
+6. **Generate Plots from Existing Data**:
    ```bash
    python generate_plots.py                    # Latest results
    python generate_plots.py --show             # Display plots
@@ -136,13 +158,44 @@ The system is configured through `config/config.yaml` which includes:
 - **Automatic plot generation**: Configurable via `save_plots` setting
 - **Multiple plot types**: Trajectory, control performance, sensor data, mission summary
 
+### Waypoint Navigation (`src/navigation/waypoint_navigator.py`)
+- Geographic waypoint missions (lat/lon/depth) with local NED conversion
+- Waypoint sequencing, tolerance handling, and loitering
+- Guidance law for desired heading/speed/depth
+- Status API for mission progress and distances
+
+### Mission Planner (`src/navigation/mission_planner.py`)
+- Utilities to generate missions:
+  - Grid search patterns
+  - Perimeter/area surveys
+  - Simple point-to-point routes
+  
+Usage example to enable waypoint navigation programmatically:
+```python
+from src.simulation_runner import AUVSimulation
+from src.navigation.mission_planner import MissionPlanner
+
+sim = AUVSimulation("config/config.yaml", scenario_name="waypoint_demo")
+mission = MissionPlanner.create_grid_search(center_lat=37.826, center_lon=-122.423,
+                                            grid_width=200.0, grid_height=150.0,
+                                            line_spacing=30.0, depth=8.0, speed=1.5,
+                                            mission_name="Grid Search Demo")
+
+# Give control to the waypoint navigator
+sim.enable_waypoint_navigation(mission)
+
+# Run with empty manual commands (navigator drives the vehicle)
+final_state, info = sim.run_scenario([], duration=600.0)
+```
+
 ## Data Output
 
 Simulation results are automatically saved to the `results/` directory:
 
-- **logs/**: CSV data files with timestamped measurements
-- **plots/**: Generated visualization plots
-- **metadata**: JSON files with simulation configuration and summary
+- Each run is stored in a timestamped folder (e.g., `results/20250101_120000_<scenario>/`)
+- `logs/`: CSV data files with timestamped measurements
+- `plots/`: Generated visualization plots
+- `metadata`: JSON files with simulation configuration and summary
 
 ## Validation Scenarios
 
@@ -155,6 +208,14 @@ A comprehensive validation scenario that tests:
 - Control system stability
 
 Success criteria include depth accuracy (±0.5m), heading accuracy (±10°), and stable completion.
+
+### Waypoint Navigation Tests (`scenarios/waypoint_navigation_test.py`)
+Demonstrates autonomous navigation between geographic waypoints with multiple mission types:
+- Simple point-to-point mission
+- Grid search survey
+- Perimeter/area survey
+
+Run with `--mission simple|grid|perimeter|all`. Mission progress and distances are reported at the end of the run, and plots are generated automatically if enabled.
 
 ## Technical Specifications
 
@@ -182,6 +243,7 @@ Success criteria include depth accuracy (±0.5m), heading accuracy (±10°), and
 - Python 3.8+
 - NumPy
 - PyYAML
+- Matplotlib
 - Pathlib (standard library)
 - Datetime (standard library)
 
@@ -193,11 +255,36 @@ Success criteria include depth accuracy (±0.5m), heading accuracy (±10°), and
 3. Define mission waypoints using `CommandIn` objects
 4. Use `AUVSimulation` class to run scenario
 
+To use geographic waypoint navigation instead of manual commands:
+1. Create a `GeographicMission` via `MissionPlanner` or manually assemble `GeographicWaypoint` objects
+2. Call `sim.enable_waypoint_navigation(mission)`
+3. Pass an empty list of manual commands to `run_scenario` (navigator will command heading/speed/depth)
+
 ### Modifying Vehicle Parameters
 1. Edit `config/config.yaml`
 2. Adjust vehicle mass, geometry, or performance parameters
 3. Tune control gains if needed
 4. Validate with test scenarios
+
+Relevant configuration groups for guidance/navigation:
+```yaml
+guidance:
+  los:
+    lookahead_distance: 10.0     # [m]
+    capture_radius: 2.0          # [m]
+navigation:
+  look_ahead_distance: 10.0      # [m]
+  waypoint_switch_distance: 5.0  # [m]
+  min_speed: 0.5                 # [m/s]
+  max_speed: 3.0                 # [m/s]
+scenarios:
+  logging:
+    log_rate: 50.0
+    save_plots: true
+    show_live_plots: true
+    live_plot_interval: 1.0
+    live_plot_trail: 200
+```
 
 ### Custom Control Algorithms
 1. Implement new controller in `src/control/`

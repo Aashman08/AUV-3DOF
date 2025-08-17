@@ -434,10 +434,16 @@ class AUVResultsPlotter:
         # Depth profile (top right)
         ax_depth = fig.add_subplot(gs[0, 2])
         ax_depth.plot(time, -z, 'b-', linewidth=2, label='Actual')
-        ax_depth.plot(time, self.data['depth_setpoint'], 'r--', linewidth=2, label='Setpoint')
+        ax_depth.plot(time, self.data['depth_setpoint'], 'r--', linewidth=2, label='Command')
         ax_depth.set_xlabel('Time [s]')
         ax_depth.set_ylabel('Depth [m]')
-        ax_depth.set_title('Depth Profile')
+        
+        # Add navigation mode context to title
+        nav_mode_info = self._get_navigation_mode_info()
+        if nav_mode_info:
+            ax_depth.set_title(f'Depth Profile ({nav_mode_info})')
+        else:
+            ax_depth.set_title('Depth Profile')
         ax_depth.legend()
         ax_depth.grid(True, alpha=0.3)
         
@@ -508,6 +514,30 @@ class AUVResultsPlotter:
             print(f"Saved mission summary plot: {self.output_dir / 'mission_summary.png'}")
         
         return fig
+    
+    def _get_navigation_mode_info(self) -> str:
+        """Get navigation mode information for plot titles."""
+        # Check if navigation mode data exists
+        if 'navigation_mode' not in self.data.columns:
+            return ""
+        
+        # Get the most common navigation mode
+        nav_modes = self.data['navigation_mode'].dropna()
+        if len(nav_modes) == 0:
+            return ""
+        
+        mode_counts = nav_modes.value_counts()
+        primary_mode = mode_counts.index[0]
+        
+        if primary_mode == "waypoint":
+            # Check if we have waypoint info
+            if 'waypoint_index' in self.data.columns:
+                max_wp = self.data['waypoint_index'].max()
+                if max_wp >= 0:
+                    return f"Waypoint Nav, {int(max_wp)+1} waypoints"
+            return "Waypoint Navigation"
+        else:
+            return "Manual Commands"
     
     def create_all_plots(self, show: bool = False) -> List[plt.Figure]:
         """

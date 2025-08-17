@@ -188,6 +188,79 @@ class EnvironmentState:
     salinity: float = 35.0            # [ppt] water salinity
 
 
+@dataclass(frozen=True)
+class GeographicWaypoint:
+    """
+    Geographic waypoint with latitude, longitude, and depth.
+    
+    This represents a target position in real-world coordinates that the AUV
+    should navigate to. The waypoint navigator will convert these to local
+    NED coordinates and generate appropriate heading/speed commands.
+    
+    Attributes:
+        latitude: Target latitude [degrees] (positive North)
+        longitude: Target longitude [degrees] (positive East)
+        depth: Target depth [m] (positive down from surface)
+        speed: Desired speed to maintain while approaching this waypoint [m/s]
+        tolerance: Acceptance radius for waypoint [m] (how close to get)
+        loiter_time: Time to stay at waypoint [s] (0 = pass through)
+        waypoint_id: Optional identifier for the waypoint
+    """
+    latitude: float                    # [deg] North positive
+    longitude: float                   # [deg] East positive  
+    depth: float                       # [m] positive down
+    speed: float = 1.5                 # [m/s] approach speed
+    tolerance: float = 5.0             # [m] acceptance radius
+    loiter_time: float = 0.0           # [s] loiter duration
+    waypoint_id: str = ""              # Optional identifier
+
+
+@dataclass(frozen=True)
+class GeographicMission:
+    """
+    Complete mission defined by geographic waypoints.
+    
+    Attributes:
+        waypoints: List of geographic waypoints to visit in sequence
+        mission_name: Descriptive name for the mission
+        origin_lat: Reference latitude for NED coordinate conversion [deg]
+        origin_lon: Reference longitude for NED coordinate conversion [deg]
+        default_speed: Default speed when not specified in waypoint [m/s]
+        emergency_surface_depth: Depth to surface to in emergency [m]
+    """
+    waypoints: List[GeographicWaypoint]
+    mission_name: str = "Untitled Mission"
+    origin_lat: float = 0.0            # [deg] NED origin
+    origin_lon: float = 0.0            # [deg] NED origin
+    default_speed: float = 1.5         # [m/s]
+    emergency_surface_depth: float = 1.0  # [m]
+
+
+@dataclass
+class NavigationState:
+    """
+    Current state of waypoint navigation.
+    
+    Attributes:
+        current_waypoint_index: Index of the currently active waypoint
+        target_waypoint: Current target waypoint in NED coordinates [m]
+        distance_to_waypoint: Straight-line distance to current waypoint [m]
+        bearing_to_waypoint: Bearing to current waypoint [deg] (0=North)
+        waypoint_achieved: True if current waypoint has been reached
+        mission_complete: True if all waypoints have been visited
+        loiter_start_time: Time when loitering at current waypoint started [s]
+        total_distance_traveled: Cumulative distance traveled [m]
+    """
+    current_waypoint_index: int = 0
+    target_waypoint: np.ndarray = field(default_factory=lambda: np.zeros(3))  # [m] NED
+    distance_to_waypoint: float = 0.0      # [m]
+    bearing_to_waypoint: float = 0.0       # [deg] 
+    waypoint_achieved: bool = False
+    mission_complete: bool = False
+    loiter_start_time: float = 0.0         # [s]
+    total_distance_traveled: float = 0.0   # [m]
+
+
 # Utility functions for unit conversions
 def degrees_to_radians(angle_deg: float) -> float:
     """Convert angle from degrees to radians."""
@@ -244,3 +317,116 @@ def rotation_matrix_to_euler(R: np.ndarray) -> Tuple[float, float, float]:
         yaw = np.arctan2(-R[0, 1], R[1, 1])
         
     return roll, pitch, yaw
+
+
+def latlon_to_ned(lat: float, lon: float, origin_lat: float, origin_lon: float) -> Tuple[float, float]:
+    """
+    Convert latitude/longitude to North-East coordinates relative to origin.
+    
+    Uses a simple flat-earth approximation suitable for small distances (< 100km).
+    For larger distances, a more sophisticated projection should be used.
+    
+    Args:
+        lat: Target latitude [degrees]
+        lon: Target longitude [degrees]  
+        origin_lat: Origin latitude [degrees]
+        origin_lon: Origin longitude [degrees]
+        
+    Returns:
+        (north, east) coordinates [meters] relative to origin
+    """
+    # Earth radius approximation
+    EARTH_RADIUS = 6371000.0  # [m]
+    
+    # Convert to radians
+    lat_rad = np.deg2rad(lat)
+    lon_rad = np.deg2rad(lon)
+    origin_lat_rad = np.deg2rad(origin_lat)
+    origin_lon_rad = np.deg2rad(origin_lon)
+    
+    # Calculate differences
+    dlat = lat_rad - origin_lat_rad
+    dlon = lon_rad - origin_lon_rad
+    
+    # Flat-earth approximation (accurate for small distances)
+    north = dlat * EARTH_RADIUS
+    east = dlon * EARTH_RADIUS * np.cos(origin_lat_rad)
+    
+    return north, east
+
+
+def ned_to_latlon(north: float, east: float, origin_lat: float, origin_lon: float) -> Tuple[float, float]:
+    """
+    Convert North-East coordinates to latitude/longitude.
+    
+    Inverse of latlon_to_ned() using flat-earth approximation.
+    
+    Args:
+        north: North coordinate [meters] relative to origin
+        east: East coordinate [meters] relative to origin
+        origin_lat: Origin latitude [degrees]
+        origin_lon: Origin longitude [degrees]
+        
+    Returns:
+        (latitude, longitude) in degrees
+    """
+    # Earth radius approximation  
+    EARTH_RADIUS = 6371000.0  # [m]
+    
+    # Convert origin to radians
+    origin_lat_rad = np.deg2rad(origin_lat)
+    origin_lon_rad = np.deg2rad(origin_lon)
+    
+    # Calculate lat/lon differences
+    dlat = north / EARTH_RADIUS
+    dlon = east / (EARTH_RADIUS * np.cos(origin_lat_rad))
+    
+    # Add to origin and convert back to degrees
+    lat = np.rad2deg(origin_lat_rad + dlat)
+    lon = np.rad2deg(origin_lon_rad + dlon)
+    
+    return lat, lon
+
+
+def calculate_bearing(from_lat: float, from_lon: float, to_lat: float, to_lon: float) -> float:
+    """
+    Calculate bearing from one lat/lon to another.
+    
+    Args:
+        from_lat: Starting latitude [degrees]
+        from_lon: Starting longitude [degrees]
+        to_lat: Target latitude [degrees]
+        to_lon: Target longitude [degrees]
+        
+    Returns:
+        Bearing [degrees] where 0=North, 90=East
+    """
+    # Convert to North-East coordinates for simple calculation
+    north, east = latlon_to_ned(to_lat, to_lon, from_lat, from_lon)
+    
+    # Calculate bearing (0=North, 90=East)
+    bearing_rad = np.arctan2(east, north)
+    bearing_deg = np.rad2deg(bearing_rad)
+    
+    # Ensure positive angle [0, 360)
+    return (bearing_deg + 360.0) % 360.0
+
+
+def calculate_distance(from_lat: float, from_lon: float, to_lat: float, to_lon: float) -> float:
+    """
+    Calculate straight-line distance between two lat/lon points.
+    
+    Args:
+        from_lat: Starting latitude [degrees]
+        from_lon: Starting longitude [degrees] 
+        to_lat: Target latitude [degrees]
+        to_lon: Target longitude [degrees]
+        
+    Returns:
+        Distance [meters]
+    """
+    # Convert to North-East coordinates
+    north, east = latlon_to_ned(to_lat, to_lon, from_lat, from_lon)
+    
+    # Euclidean distance
+    return np.sqrt(north**2 + east**2)

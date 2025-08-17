@@ -21,7 +21,7 @@ from dataclasses import dataclass
 # Add src to path for imports
 sys.path.append(str(Path(__file__).parent.parent))
 
-from data_types.types import CommandIn, ActuatorOut, SensorsIn, degrees_to_radians, radians_to_degrees
+from data_types.types import CommandIn, ActuatorOut, SensorsIn, VehicleState, degrees_to_radians, radians_to_degrees
 from utils.logging_config import get_logger
 
 logger = get_logger()
@@ -160,6 +160,10 @@ class AUVController:
         # Initialize timing state
         self.last_update_time = 0.0
         
+        # Optional waypoint navigator (lazy initialization)
+        self.waypoint_navigator = None
+        self._navigation_mode = "manual"  # "manual" or "waypoint"
+        
         # Create individual PID controllers
         speed_cfg = control_cfg['speed_controller']
         self.speed_controller = PIDController(
@@ -204,6 +208,55 @@ class AUVController:
         
         logger.info("AUV control system initialized")
     
+    def enable_waypoint_navigation(self, mission=None):
+        """
+        Enable waypoint navigation mode.
+        
+        Args:
+            mission: Optional GeographicMission to load immediately
+        """
+        try:
+            # Import navigation module (lazy loading to avoid circular imports)
+            sys.path.append(str(Path(__file__).parent.parent / "navigation"))
+            from waypoint_navigator import WaypointNavigator
+            
+            if self.waypoint_navigator is None:
+                self.waypoint_navigator = WaypointNavigator(self.config)
+            
+            if mission is not None:
+                success = self.waypoint_navigator.load_mission(mission)
+                if not success:
+                    logger.error("Failed to load mission")
+                    return False
+            
+            self._navigation_mode = "waypoint"
+            logger.info("Waypoint navigation enabled")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to enable waypoint navigation: {e}")
+            return False
+    
+    def disable_waypoint_navigation(self):
+        """Disable waypoint navigation and return to manual mode."""
+        self._navigation_mode = "manual"
+        logger.info("Waypoint navigation disabled - returned to manual mode")
+    
+    def load_mission(self, mission):
+        """
+        Load a new mission for waypoint navigation.
+        
+        Args:
+            mission: GeographicMission to execute
+            
+        Returns:
+            True if mission loaded successfully
+        """
+        if self.waypoint_navigator is None:
+            return self.enable_waypoint_navigation(mission)
+        else:
+            return self.waypoint_navigator.load_mission(mission)
+    
     def _setup_fin_allocation(self, config: Dict[str, Any]):
         """Setup control allocation matrix for X-tail configuration."""
         # X-tail configuration: 4 fins at ±45° angles
@@ -225,7 +278,7 @@ class AUVController:
             [ 0.0,  1.0,  0.0, -1.0]   # Yaw: left fin positive, right negative
         ])
     
-    def update(self, commands: CommandIn, sensors: SensorsIn, dt: float) -> ActuatorOut:
+    def update(self, commands: CommandIn, sensors: SensorsIn, dt: float, vehicle_state: VehicleState = None) -> ActuatorOut:
         """
         Update control system and generate actuator commands.
         
@@ -233,12 +286,27 @@ class AUVController:
             commands: High-level command inputs
             sensors: Current sensor measurements
             dt: Control timestep [s]
+            vehicle_state: Current vehicle state (required for waypoint navigation)
             
         Returns:
             ActuatorOut with thrust and fin commands
         """
+        # Handle waypoint navigation if enabled
+        if self._navigation_mode == "waypoint" and self.waypoint_navigator is not None:
+            if vehicle_state is None:
+                logger.warning("Waypoint navigation requires vehicle_state - falling back to manual mode")
+                active_commands = commands
+            else:
+                # Generate navigation commands from waypoint navigator
+                nav_commands = self.waypoint_navigator.update_navigation(vehicle_state, commands.timestamp)
+                # Use navigation commands instead of input commands
+                active_commands = nav_commands
+        else:
+            # Use manual commands directly
+            active_commands = commands
+        
         # Apply safety limits to commands
-        safe_commands = self._apply_safety_limits(commands)
+        safe_commands = self._apply_safety_limits(active_commands)
         
         # === SPEED CONTROL ===
         # Use DVL velocity for feedback (surge component)
@@ -414,13 +482,46 @@ class AUVController:
     
     def get_status(self) -> Dict[str, Any]:
         """Get comprehensive control system status."""
-        return {
+        status = {
             'speed_controller': self.speed_controller.get_state(),
             'heading_controller': self.heading_controller.get_state(),
             'pitch_controller': self.pitch_controller.get_state(),
+            'navigation_mode': self._navigation_mode,
             'safety_limits': {
                 'max_speed': self.max_speed,
                 'max_pitch_angle': radians_to_degrees(self.max_pitch_angle),
                 'max_yaw_rate': radians_to_degrees(self.max_yaw_rate)
             }
         }
+        
+        # Add navigation status if waypoint navigation is active
+        if self._navigation_mode == "waypoint" and self.waypoint_navigator is not None:
+            status['navigation_status'] = self.waypoint_navigator.get_navigation_status()
+        
+        return status
+    
+    def get_actual_commands(self, original_commands: CommandIn, vehicle_state: VehicleState = None, current_time: float = 0.0) -> CommandIn:
+        """
+        Get the actual commands being executed by the control system.
+        
+        In manual mode, this returns the original commands.
+        In waypoint navigation mode, this returns the navigation-generated commands.
+        
+        Args:
+            original_commands: Original manual commands
+            vehicle_state: Current vehicle state (needed for waypoint navigation)
+            current_time: Current simulation time
+            
+        Returns:
+            CommandIn with the actual commands being executed
+        """
+        if self._navigation_mode == "waypoint" and self.waypoint_navigator is not None:
+            if vehicle_state is not None:
+                # Return the waypoint navigation commands
+                return self.waypoint_navigator.update_navigation(vehicle_state, current_time)
+            else:
+                # Fallback to original commands if no vehicle state available
+                return original_commands
+        else:
+            # Manual mode - return original commands
+            return original_commands

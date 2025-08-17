@@ -236,6 +236,7 @@ class DataLogger:
             "u", "v", "w", "p", "q", "r",
             "thrust_cmd", "fin1_cmd", "fin2_cmd", "fin3_cmd", "fin4_cmd",
             "speed_setpoint", "heading_setpoint", "depth_setpoint",
+            "navigation_mode", "waypoint_index", "distance_to_waypoint", "waypoint_achieved",
             "imu_ax", "imu_ay", "imu_az", "imu_gx", "imu_gy", "imu_gz",
             "dvl_u", "dvl_v", "dvl_w", "depth_sensor", "mag_heading"
         ]
@@ -247,7 +248,7 @@ class DataLogger:
         """Check if data should be logged based on log rate."""
         return (current_time - self.last_log_time) >= self.dt
     
-    def log_data(self, time: float, vehicle_state, sensors, commands, actuators):
+    def log_data(self, time: float, vehicle_state, sensors, commands, actuators, navigation_status=None):
         """
         Log complete system state.
         
@@ -264,6 +265,20 @@ class DataLogger:
         # Convert radians to degrees for logging
         orientation_deg = np.degrees(vehicle_state.orientation)
         angular_vel_deg = np.degrees(vehicle_state.angular_velocity)
+        
+        # Extract navigation data
+        nav_mode = "manual"
+        waypoint_index = -1
+        distance_to_waypoint = 0.0
+        waypoint_achieved = False
+        
+        if navigation_status:
+            nav_mode = navigation_status.get('navigation_mode', 'manual')
+            if 'navigation_status' in navigation_status:
+                nav_status = navigation_status['navigation_status']
+                waypoint_index = nav_status.get('current_waypoint_index', -1)
+                distance_to_waypoint = nav_status.get('distance_to_waypoint', 0.0)
+                waypoint_achieved = nav_status.get('waypoint_achieved', False)
         
         # Prepare data row
         data_row = [
@@ -288,6 +303,10 @@ class DataLogger:
             f"{commands.desired_speed:.3f}",
             f"{commands.desired_heading:.3f}",
             f"{commands.desired_depth:.3f}",
+            f"{nav_mode}",
+            f"{waypoint_index}",
+            f"{distance_to_waypoint:.3f}",
+            f"{waypoint_achieved}",
             f"{sensors.imu_accel_xyz[0]:.6f}",
             f"{sensors.imu_accel_xyz[1]:.6f}",
             f"{sensors.imu_accel_xyz[2]:.6f}",

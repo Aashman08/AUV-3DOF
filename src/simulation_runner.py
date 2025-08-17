@@ -105,6 +105,30 @@ class AUVSimulation:
         
         self.logger.info("AUV simulation initialized successfully")
     
+    def enable_waypoint_navigation(self, mission=None):
+        """
+        Enable waypoint navigation mode for the simulation.
+        
+        Args:
+            mission: Optional GeographicMission to load
+            
+        Returns:
+            True if successfully enabled
+        """
+        return self.controller.enable_waypoint_navigation(mission)
+    
+    def load_mission(self, mission):
+        """
+        Load a geographic mission for waypoint navigation.
+        
+        Args:
+            mission: GeographicMission to execute
+            
+        Returns:
+            True if mission loaded successfully
+        """
+        return self.controller.load_mission(mission)
+    
     def _setup_live_plotter(self):
         """Setup live plotter if enabled."""
         try:
@@ -245,8 +269,12 @@ class AUVSimulation:
             if self.step_count % int(self.control_dt / self.physics_dt) == 0:
                 # Control update at lower frequency
                 actuator_commands = self.controller.update(
-                    current_command, sensor_data, self.control_dt
+                    current_command, sensor_data, self.control_dt, self.vehicle_state
                 )
+                
+                # Get the actual commands being executed (for waypoint navigation)
+                # This will be the original command in manual mode, or the navigation command in waypoint mode
+                actual_commands = self.controller.get_actual_commands(current_command, self.vehicle_state, self.current_time)
             
             # === ACTUATOR DYNAMICS ===
             # Update propulsion system
@@ -269,9 +297,12 @@ class AUVSimulation:
             )
             
             # === DATA LOGGING ===
+            # Get navigation status for logging
+            control_status = self.controller.get_status()
+            
             self.data_logger.log_data(
                 self.current_time, self.vehicle_state, sensor_data,
-                current_command, actuator_commands
+                actual_commands, actuator_commands, control_status
             )
             
             # === LIVE PLOTTING ===
@@ -279,7 +310,7 @@ class AUVSimulation:
                 self.current_time - self.last_plot_time >= self.plot_interval):
                 self.live_plotter.update_data(
                     self.current_time, self.vehicle_state, sensor_data,
-                    current_command, actuator_commands, actual_thrust
+                    actual_commands, actuator_commands, actual_thrust, control_status
                 )
                 self.last_plot_time = self.current_time
             

@@ -179,6 +179,23 @@ guidance:
     loiter_radius: 5.0        # [m] Loiter radius around waypoints
     path_following_speed: 2.0 # [m/s] Speed during path following
 
+# Navigation System
+navigation:
+  # Waypoint navigation parameters
+  look_ahead_distance: 10.0   # [m] Distance to start slowing down for waypoint
+  waypoint_switch_distance: 5.0  # [m] Distance to consider waypoint reached
+  min_speed: 0.5              # [m/s] Minimum navigation speed
+  max_speed: 3.0              # [m/s] Maximum navigation speed
+  
+  # Path following parameters
+  cross_track_gain: 0.5       # [1/m] Cross-track error gain for path following
+  along_track_gain: 1.0       # [1/m] Along-track error gain
+  
+  # Mission parameters
+  default_tolerance: 5.0      # [m] Default waypoint acceptance radius
+  default_depth: 5.0          # [m] Default mission depth
+  emergency_surface_depth: 1.0  # [m] Emergency surface depth
+
 # Simulation Scenarios
 scenarios:
   # Test scenario parameters
