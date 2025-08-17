@@ -20,7 +20,7 @@ This simulation provides a realistic physics-based model of an AUV with complete
 
 ## Repository Structure
 
-```bash
+```tree
 auv_gnc_simulation/
 ├── config/
 │   └── config.yaml                    # Main configuration file
@@ -55,6 +55,54 @@ auv_gnc_simulation/
 ├── generate_plots.py                  # Standalone plot generation utility
 └── README.md                          
 ```
+
+<details><summary>Project structure</summary>
+
+<!-- (paste the mermaid block here) -->
+```mermaid
+flowchart TB
+    A[auv_gnc_simulation/]:::dir
+    A --> C[config/]:::dir
+    C --> C1[config.yaml]:::misc
+    A --> S[src/]:::dir
+    S --> SD[data_types/]:::dir
+    SD --> SD1[types.py]:::py
+    S --> SP[physics/]:::dir
+    SP --> SP1[vehicle_dynamics.py]:::py
+    S --> SA[actuators/]:::dir
+    SA --> SA1[propulsion.py]:::py
+    S --> SS[sensors/]:::dir
+    SS --> SS1[sensor_models.py]:::py
+    S --> SC[control/]:::dir
+    SC --> SC1[pid_controller.py]:::py
+    S --> SN[navigation/]:::dir
+    SN --> SN1[mission_planner.py]:::py
+    SN --> SN2[waypoint_navigator.py]:::py
+    S --> SU[utils/]:::dir
+    SU --> SU1[logging_config.py]:::py
+    S --> SR[simulation_runner.py]:::py
+    A --> SCN[scenarios/]:::dir
+    SCN --> SCN1[basic_test.py]:::py
+    SCN --> SCN2[waypoint_navigation_test.py]:::py
+    A --> R[results/]:::dir
+    R --> RL[logs/]:::dir
+    R --> RP[plots/]:::dir
+    A --> T[tests/]:::dir
+    A --> V[visualization/]:::dir
+    V --> V1[plot_results.py]:::py
+    V --> V2[live_plot.py]:::py
+    A --> TP[test_live_plot.py]:::py
+    A --> GP[generate_plots.py]:::py
+    A --> RD[README.md]:::md
+
+    classDef dir fill:#e7f1ff,stroke:#5989d6,stroke-width:1px;
+    classDef py  fill:#e9ffe7,stroke:#5fb760,stroke-width:1px;
+    classDef md  fill:#fff7cc,stroke:#d6b65a,stroke-width:1px;
+    classDef misc fill:#f3f3f3,stroke:#bdbdbd,stroke-width:1px;
+```
+
+</details>
+
 
 ## Configuration
 
