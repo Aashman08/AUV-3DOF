@@ -206,8 +206,9 @@ class DepthSensor:
         Returns:
             Depth measurement [m] (positive down)
         """
-        # True depth (position[2] is negative for underwater)
-        true_depth = -state.position[2]  # Convert to positive depth
+        # True depth in NED coordinates (Z negative underwater)
+        # Convert negative Z position to positive depth measurement
+        true_depth = -state.position[2]
         
         # Add noise and quantize to resolution
         noise = np.random.normal(0, self.noise_std)
@@ -377,6 +378,7 @@ class SensorSuite:
             dvl_velocity_xyz=tuple(dvl_meas if dvl_valid else [0.0, 0.0, 0.0]),
             depth=depth_meas,
             magnetometer_heading=heading_meas,
+            attitude_pitch=radians_to_degrees(state.orientation[1]),  # True pitch for simulation
             gps_position_xy=tuple(gps_pos) if gps_valid else None,
             gps_valid=gps_valid
         )

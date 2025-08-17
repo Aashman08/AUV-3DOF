@@ -242,8 +242,10 @@ class VehicleDynamics:
         yaw_new = yaw + r * dt
         
         # === KINEMATIC DEPTH ===
-        # Simplified depth kinematics: dz/dt = u * sin(θ)
-        # This assumes pitch angle directly controls vertical velocity
+        # Simplified depth kinematics in NED coordinates (z negative underwater):
+        # - Positive pitch (nose up) → u*sin(+) = positive z_dot → increasing z → going toward surface
+        # - Negative pitch (nose down) → u*sin(-) = negative z_dot → decreasing z → going deeper
+        # This is CORRECT for NED where z=-5 is 5m underwater
         z_dot = u * np.sin(pitch)
         z_new = z + z_dot * dt
         

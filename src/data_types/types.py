@@ -34,6 +34,7 @@ class SensorsIn:
         dvl_velocity_xyz: Velocity [m/s] in body frame from Doppler log
         depth: Depth below surface [m] (positive down)
         magnetometer_heading: Magnetic heading [deg] (0=North, 90=East)
+        attitude_pitch: Pitch angle [deg] (nose up positive) - for simulation only
         gps_position_xy: GPS position [m] in global frame (x=North, y=East)
         gps_valid: True if GPS fix is valid (surface only)
     """
@@ -49,6 +50,7 @@ class SensorsIn:
     # Position and orientation measurements (global frame)
     depth: float                                  # [m] depth below surface
     magnetometer_heading: float                   # [deg] magnetic heading
+    attitude_pitch: float                         # [deg] pitch angle (simulation only)
     
     # GPS (when available)
     gps_position_xy: Optional[Tuple[float, float]] # [m] (North, East)

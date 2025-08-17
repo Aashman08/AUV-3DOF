@@ -1,4 +1,3 @@
-/results/
 *.log
 *.log.*
 
@@ -8,4 +7,4 @@
 /plots/
 /tmp/
 /__pycache__/
-
+results/

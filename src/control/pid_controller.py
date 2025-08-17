@@ -157,6 +157,9 @@ class AUVController:
         self.config = config
         control_cfg = config['control']
         
+        # Initialize timing state
+        self.last_update_time = 0.0
+        
         # Create individual PID controllers
         speed_cfg = control_cfg['speed_controller']
         self.speed_controller = PIDController(
@@ -187,7 +190,7 @@ class AUVController:
         )
         
         # Depth controller (generates pitch reference)
-        self.depth_kp = 0.1  # [rad/m] Depth error to pitch angle gain
+        self.depth_kp = 0.05  # [rad/m] Depth error to pitch angle gain (reduced from 0.1)
         self.max_pitch_for_depth = degrees_to_radians(15.0)  # [rad] Max pitch for depth control
         
         # Fin allocation matrix (maps moments to fin deflections)
@@ -251,12 +254,19 @@ class AUVController:
             )
         
         # === DEPTH CONTROL (generates pitch reference) ===
-        current_depth = sensors.depth  # [m]
-        depth_error = safe_commands.desired_depth - current_depth
+        current_depth = sensors.depth  # [m] positive down from depth sensor
+        depth_error = safe_commands.desired_depth - current_depth  # [m]
         
         # Simple proportional depth control generating pitch reference
+        # Vehicle dynamics: z_dot = u * sin(pitch) (NED coordinates, z negative underwater)
+        # - Positive pitch (nose up) → positive z_dot → increasing z → toward surface (less deep)
+        # - Negative pitch (nose down) → negative z_dot → decreasing z → deeper underwater
+        # 
+        # Control logic:
+        # - Positive depth_error (need deeper) → negative pitch (nose down)
+        # - Negative depth_error (need shallower) → positive pitch (nose up)
         pitch_reference = np.clip(
-            self.depth_kp * depth_error,
+            -self.depth_kp * depth_error,
             -self.max_pitch_for_depth,
             self.max_pitch_for_depth
         )
@@ -266,9 +276,11 @@ class AUVController:
             pitch_reference = degrees_to_radians(safe_commands.desired_pitch)
         
         # === ATTITUDE CONTROL ===
-        # Extract current attitude from sensors
+        # For simulation, use the true attitude measurements
         current_heading = degrees_to_radians(sensors.magnetometer_heading)  # [rad]
-        current_pitch = degrees_to_radians(sensors.imu_gyro_xyz[1])  # Integrate to get pitch
+        current_pitch = degrees_to_radians(sensors.attitude_pitch)          # [rad]
+        
+        self.last_update_time = commands.timestamp
         
         # Heading control
         heading_reference = degrees_to_radians(safe_commands.desired_heading)
@@ -376,6 +388,10 @@ class AUVController:
         self.speed_controller.reset()
         self.heading_controller.reset() 
         self.pitch_controller.reset()
+        
+        # Reset timing state
+        self.last_update_time = 0.0
+        
         logger.info("All controllers reset")
     
     def get_status(self) -> Dict[str, Any]:

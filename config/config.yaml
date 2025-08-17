@@ -135,7 +135,7 @@ sensors:
 # Control System Parameters
 control:
   # Simulation timing
-  physics_dt: 0.0025       # [s] Physics integration timestep (400 Hz)
+  physics_dt: 0.02      # [s] Physics integration timestep (400 Hz)
   control_dt: 0.02         # [s] Control loop timestep (50 Hz)
   
   # Speed Controller (PI)

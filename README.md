@@ -166,7 +166,7 @@ Success criteria include depth accuracy (±0.5m), heading accuracy (±10°), and
 - **Max Depth**: 600m
 
 ### Control Performance
-- **Physics Rate**: 400 Hz (0.0025s timestep)
+- **Physics Rate**: 50 Hz (0.02s timestep)
 - **Control Rate**: 50 Hz (0.02s timestep)
 - **Sensor Rates**: 1-100 Hz (sensor dependent)
 - **Data Logging**: Configurable (default 50 Hz)
