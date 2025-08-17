@@ -72,11 +72,15 @@ class LiveAUVPlotter:
             'depth_cmd': deque(maxlen=trail_length),
             'heading_actual': deque(maxlen=trail_length),
             'heading_cmd': deque(maxlen=trail_length),
-            'thrust': deque(maxlen=trail_length)
+            'pitch_actual': deque(maxlen=trail_length),
+            'pitch_cmd': deque(maxlen=trail_length),
+            'thrust_actual': deque(maxlen=trail_length),
+            'thrust_cmd': deque(maxlen=trail_length)
         }
         
-        # Matplotlib setup
-        self.fig = None
+        # Matplotlib setup - separate figures for 3D and controls
+        self.fig_3d = None  # Separate window for 3D trajectory
+        self.fig_controls = None  # Controls window
         self.axes = {}
         self.lines = {}
         self.scatters = {}
@@ -123,8 +127,10 @@ class LiveAUVPlotter:
         
         # Close matplotlib windows
         try:
-            if self.fig:
-                plt.close(self.fig)
+            if self.fig_3d:
+                plt.close(self.fig_3d)
+            if self.fig_controls:
+                plt.close(self.fig_controls)
             plt.ioff()  # Turn off interactive mode
         except Exception as e:
             print(f"Error closing plots: {e}")
@@ -150,7 +156,7 @@ class LiveAUVPlotter:
         self.trajectory_data['time'].append(time)
         self.trajectory_data['x'].append(vehicle_state.position[0])
         self.trajectory_data['y'].append(vehicle_state.position[1])
-        self.trajectory_data['z'].append(vehicle_state.position[2])
+        self.trajectory_data['z'].append(-vehicle_state.position[2])  # Convert to positive depth
         self.trajectory_data['roll'].append(np.degrees(vehicle_state.orientation[0]))
         self.trajectory_data['pitch'].append(np.degrees(vehicle_state.orientation[1]))
         self.trajectory_data['yaw'].append(np.degrees(vehicle_state.orientation[2]))
@@ -164,7 +170,13 @@ class LiveAUVPlotter:
         self.control_data['depth_cmd'].append(commands.desired_depth)
         self.control_data['heading_actual'].append(np.degrees(vehicle_state.orientation[2]))
         self.control_data['heading_cmd'].append(commands.desired_heading)
-        self.control_data['thrust'].append(actuators.thrust_command)
+        self.control_data['pitch_actual'].append(np.degrees(vehicle_state.orientation[1]))
+        self.control_data['pitch_cmd'].append(commands.desired_pitch)
+        # For thrust, we can show commanded vs actual if thrust dynamics are modeled
+        # actuators.thrust_command is what the controller commanded
+        # The actual thrust would come from propulsion system dynamics (if implemented)
+        self.control_data['thrust_cmd'].append(actuators.thrust_command)
+        self.control_data['thrust_actual'].append(actuators.thrust_command)  # Could be different with thrust lag/dynamics
         
         # Update plots if enough time has passed
         if time - self.last_plot_time >= self.update_interval:
@@ -178,88 +190,83 @@ class LiveAUVPlotter:
 
     
     def _setup_plots(self):
-        """Set up matplotlib figures and axes."""
-        # Determine subplot layout
-        if self.show_3d and self.show_controls:
-            self.fig = plt.figure(figsize=(16, 10))
-            gs = gridspec.GridSpec(2, 3, hspace=0.3, wspace=0.3)
-            
-            # 3D trajectory (spans 2 rows, 1 column)
-            self.axes['3d'] = self.fig.add_subplot(gs[:, 0], projection='3d')
-            
-            # Control plots (2x2 grid on right side)
-            self.axes['speed'] = self.fig.add_subplot(gs[0, 1])
-            self.axes['depth'] = self.fig.add_subplot(gs[0, 2])
-            self.axes['heading'] = self.fig.add_subplot(gs[1, 1])
-            self.axes['thrust'] = self.fig.add_subplot(gs[1, 2])
-            
-        elif self.show_3d:
-            self.fig = plt.figure(figsize=(12, 8))
-            self.axes['3d'] = self.fig.add_subplot(111, projection='3d')
-            
-        elif self.show_controls:
-            self.fig, axes_array = plt.subplots(2, 2, figsize=(12, 8))
-            self.axes['speed'] = axes_array[0, 0]
-            self.axes['depth'] = axes_array[0, 1]
-            self.axes['heading'] = axes_array[1, 0]
-            self.axes['thrust'] = axes_array[1, 1]
+        """Set up matplotlib figures and axes in separate windows."""
         
-        # Initialize 3D plot
+        # Create separate window for 3D trajectory
         if self.show_3d:
+            self.fig_3d = plt.figure(figsize=(12, 9))
+            self.fig_3d.suptitle('AUV Live 3D Trajectory', fontsize=16, fontweight='bold')
+            self.axes['3d'] = self.fig_3d.add_subplot(111, projection='3d')
             self._setup_3d_plot()
-        
-        # Initialize control plots
-        if self.show_controls:
-            self._setup_control_plots()
-        
-        self.fig.suptitle('AUV Live Simulation Visualization', fontsize=16, fontweight='bold')
-        
-        # Use subplots_adjust instead of tight_layout for 3D compatibility
-        if self.show_3d and self.show_controls:
-            plt.subplots_adjust(hspace=0.3, wspace=0.3)
-        else:
-            plt.tight_layout()
             
-        plt.show(block=False)
+            # Position the 3D window
+            mngr = self.fig_3d.canvas.manager
+            mngr.window.wm_geometry("+100+100")  # Position at (100, 100)
+            plt.figure(self.fig_3d.number)
+            plt.show(block=False)
+        
+        # Create separate window for control plots  
+        if self.show_controls:
+            self.fig_controls = plt.figure(figsize=(14, 10))
+            self.fig_controls.suptitle('AUV Control Performance', fontsize=16, fontweight='bold')
+            
+            # Create 3x2 grid for control plots (added pitch)
+            gs = gridspec.GridSpec(3, 2, hspace=0.4, wspace=0.3)
+            self.axes['speed'] = self.fig_controls.add_subplot(gs[0, 0])
+            self.axes['depth'] = self.fig_controls.add_subplot(gs[0, 1])
+            self.axes['heading'] = self.fig_controls.add_subplot(gs[1, 0])
+            self.axes['pitch'] = self.fig_controls.add_subplot(gs[1, 1])
+            self.axes['thrust'] = self.fig_controls.add_subplot(gs[2, 0])
+            
+            # Position the controls window to the right of 3D window
+            mngr = self.fig_controls.canvas.manager
+            mngr.window.wm_geometry("+800+100")  # Position at (800, 100)
+            
+            self._setup_control_plots()
+            plt.figure(self.fig_controls.number)
+            plt.show(block=False)
     
     def _setup_3d_plot(self):
-        """Set up 3D trajectory plot."""
+        """Set up 3D trajectory plot with AUV visualization."""
         ax = self.axes['3d']
         
         # Initialize empty line for trajectory
         self.lines['trajectory'], = ax.plot([], [], [], 'b-', linewidth=2, alpha=0.7, label='Trajectory')
         
-        # Current position marker
-        self.scatters['current'] = ax.scatter([], [], [], c='red', s=100, label='Current Position')
-        
         # Start position marker (will be set when first data arrives)
         self.scatters['start'] = ax.scatter([], [], [], c='green', s=80, label='Start')
+        
+        # Current position marker (AUV position)
+        self.scatters['current'] = ax.scatter([], [], [], c='red', s=100, label='Current Position')
         
         # Set initial view
         ax.set_xlabel('North [m]')
         ax.set_ylabel('East [m]')
-        ax.set_zlabel('Depth [m] (negative down)')
+        ax.set_zlabel('Depth [m] (positive down)')
         ax.set_title('Real-time 3D Trajectory')
-        ax.legend()
+        ax.legend(loc='upper right')
         ax.grid(True)
         
         # Set initial limits (will be updated dynamically)
         ax.set_xlim(-10, 10)
         ax.set_ylim(-10, 10)
-        ax.set_zlim(-20, 0)
-        ax.invert_zaxis()  # Depth increases downward
+        ax.set_zlim(0, 20)
+        # Don't invert z-axis - let depth be positive going down
         
-        # Add status text
+        # Add status text with more information
         self.texts['status'] = ax.text2D(0.02, 0.98, '', transform=ax.transAxes, 
-                                        verticalalignment='top', fontfamily='monospace',
+                                        verticalalignment='top', fontfamily='monospace', fontsize=10,
                                         bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.8))
+        
+        # Better 3D viewing angle
+        ax.view_init(elev=20, azim=45)
     
     def _setup_control_plots(self):
         """Set up control system monitoring plots."""
         # Speed control
         ax = self.axes['speed']
-        self.lines['speed_actual'], = ax.plot([], [], 'b-', linewidth=2, label='Actual')
-        self.lines['speed_cmd'], = ax.plot([], [], 'r--', linewidth=2, label='Command')
+        self.lines['speed_actual'], = ax.plot([], [], 'b-', linewidth=2, label='Actual Speed')
+        self.lines['speed_cmd'], = ax.plot([], [], 'r--', linewidth=2, label='Target Speed')
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Speed [m/s]')
         ax.set_title('Speed Control')
@@ -268,8 +275,8 @@ class LiveAUVPlotter:
         
         # Depth control
         ax = self.axes['depth']
-        self.lines['depth_actual'], = ax.plot([], [], 'b-', linewidth=2, label='Actual')
-        self.lines['depth_cmd'], = ax.plot([], [], 'r--', linewidth=2, label='Command')
+        self.lines['depth_actual'], = ax.plot([], [], 'b-', linewidth=2, label='Actual Depth')
+        self.lines['depth_cmd'], = ax.plot([], [], 'r--', linewidth=2, label='Target Depth')
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Depth [m]')
         ax.set_title('Depth Control')
@@ -278,20 +285,31 @@ class LiveAUVPlotter:
         
         # Heading control
         ax = self.axes['heading']
-        self.lines['heading_actual'], = ax.plot([], [], 'b-', linewidth=2, label='Actual')
-        self.lines['heading_cmd'], = ax.plot([], [], 'r--', linewidth=2, label='Command')
+        self.lines['heading_actual'], = ax.plot([], [], 'b-', linewidth=2, label='Actual Heading')
+        self.lines['heading_cmd'], = ax.plot([], [], 'r--', linewidth=2, label='Target Heading')
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Heading [deg]')
         ax.set_title('Heading Control')
         ax.legend()
         ax.grid(True, alpha=0.3)
         
-        # Thrust command
+        # Pitch control
+        ax = self.axes['pitch']
+        self.lines['pitch_actual'], = ax.plot([], [], 'b-', linewidth=2, label='Actual Pitch')
+        self.lines['pitch_cmd'], = ax.plot([], [], 'r--', linewidth=2, label='Target Pitch')
+        ax.set_xlabel('Time [s]')
+        ax.set_ylabel('Pitch [deg]')
+        ax.set_title('Pitch Control')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
+        # Thrust control
         ax = self.axes['thrust']
-        self.lines['thrust'], = ax.plot([], [], 'g-', linewidth=2, label='Thrust')
+        self.lines['thrust_actual'], = ax.plot([], [], 'b-', linewidth=2, label='Actual Thrust')
+        self.lines['thrust_cmd'], = ax.plot([], [], 'r--', linewidth=2, label='Target Thrust')
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Thrust [N]')
-        ax.set_title('Thrust Command')
+        ax.set_title('Thrust Control')
         ax.legend()
         ax.grid(True, alpha=0.3)
     
@@ -310,8 +328,12 @@ class LiveAUVPlotter:
         
         # Redraw (non-blocking)
         try:
-            self.fig.canvas.draw_idle()  # Use draw_idle for better performance
-            self.fig.canvas.flush_events()
+            if self.fig_3d:
+                self.fig_3d.canvas.draw_idle()
+                self.fig_3d.canvas.flush_events()
+            if self.fig_controls:
+                self.fig_controls.canvas.draw_idle()
+                self.fig_controls.canvas.flush_events()
             plt.pause(0.001)  # Very short pause to allow GUI updates
         except Exception as e:
             # If plotting fails, disable it to prevent simulation crashes
@@ -319,7 +341,7 @@ class LiveAUVPlotter:
             self.is_running = False
     
     def _update_3d_plot(self):
-        """Update 3D trajectory visualization."""
+        """Update 3D trajectory visualization with AUV representation."""
         if 'trajectory' not in self.lines:
             return
         
@@ -338,30 +360,136 @@ class LiveAUVPlotter:
         # Update trajectory line
         self.lines['trajectory'].set_data_3d(x, y, z)
         
-        # Update current position
-        self.scatters['current']._offsets3d = ([x[-1]], [y[-1]], [z[-1]])
+        # Set start position (only once) - use direct coordinate update
+        if len(x) > 0:
+            # For start position, only set once
+            if not hasattr(self, '_start_position_set'):
+                self.scatters['start']._offsets3d = ([x[0]], [y[0]], [z[0]])
+                self._start_position_set = True
+            
+            # Update current position marker using direct coordinate assignment
+            # This is more reliable than remove/recreate approach
+            try:
+                # Method 1: Direct coordinate update (most reliable)
+                self.scatters['current']._offsets3d = ([x[-1]], [y[-1]], [z[-1]])
+                
+                # Ensure the scatter plot collection is marked as stale for redraw
+                self.scatters['current'].stale = True
+                
+                # Debug: Check if coordinates are valid
+                if not (np.isfinite(x[-1]) and np.isfinite(y[-1]) and np.isfinite(z[-1])):
+                    print(f"Warning: Invalid coordinates for marker: x={x[-1]}, y={y[-1]}, z={z[-1]}")
+                
+            except (AttributeError, TypeError) as e:
+                # Method 2: Fallback - update using set_offsets for 2D and manual 3D
+                try:
+                    # For 3D scatter plots, we need to manually update the internal data
+                    import matplotlib.collections as mcoll
+                    if hasattr(self.scatters['current'], '_offsets3d'):
+                        self.scatters['current']._offsets3d = ([x[-1]], [y[-1]], [z[-1]])
+                    else:
+                        # If _offsets3d doesn't exist, recreate the scatter
+                        self.scatters['current'].remove()
+                        self.scatters['current'] = ax.scatter([x[-1]], [y[-1]], [z[-1]], 
+                                                            c='red', s=100, label='Current Position')
+                except Exception as e2:
+                    # Method 3: Last resort - recreate scatter
+                    print(f"Warning: Using fallback scatter recreation: {e}, {e2}")
+                    try:
+                        self.scatters['current'].remove()
+                    except:
+                        pass  # Ignore removal errors
+                    self.scatters['current'] = ax.scatter([x[-1]], [y[-1]], [z[-1]], 
+                                                        c='red', s=100, label='Current Position')
         
-        # Set start position (only once)
-        if len(x) > 0 and len(self.scatters['start'].get_offsets()) == 0:
-            self.scatters['start']._offsets3d = ([x[0]], [y[0]], [z[0]])
+        # Enhanced dynamic axis limits with guaranteed marker visibility
+        # Get current position for centering
+        current_x, current_y, current_z = x[-1], y[-1], z[-1]
         
-        # Dynamic axis limits with margin
-        margin = 5.0
-        x_range = [x.min() - margin, x.max() + margin] if len(x) > 1 else [-margin, margin]
-        y_range = [y.min() - margin, y.max() + margin] if len(y) > 1 else [-margin, margin]
-        z_range = [z.min() - margin, z.max() + margin] if len(z) > 1 else [-margin, margin]
+        # Calculate adaptive margins that guarantee marker visibility
+        base_margin = 10.0  # Increased base margin for better visibility
+        min_margin = 5.0    # Minimum margin to always keep around current position
         
+        # For X and Y axes - ensure current position is well within bounds
+        if len(x) > 1:
+            x_spread = x.max() - x.min()
+            y_spread = y.max() - y.min()
+            z_spread = z.max() - z.min()
+            
+            # Adaptive margin based on trajectory size, but never less than minimum
+            x_margin = max(min_margin, base_margin, x_spread * 0.4)
+            y_margin = max(min_margin, base_margin, y_spread * 0.4) 
+            z_margin = max(min_margin, base_margin, z_spread * 0.4)
+            
+            # Ensure current position is always well within bounds
+            # Calculate range that guarantees current position is in the middle 60% of view
+            safety_factor = 1.2  # Extra safety margin
+            x_range = [min(x.min(), current_x) - x_margin * safety_factor, 
+                      max(x.max(), current_x) + x_margin * safety_factor]
+            y_range = [min(y.min(), current_y) - y_margin * safety_factor, 
+                      max(y.max(), current_y) + y_margin * safety_factor]
+            z_range = [max(0, min(z.min(), current_z) - z_margin * safety_factor), 
+                      max(z.max(), current_z) + z_margin * safety_factor]
+        else:
+            # Single point - center around current position with generous margins
+            x_range = [current_x - base_margin, current_x + base_margin]
+            y_range = [current_y - base_margin, current_y + base_margin]
+            z_range = [max(0, current_z - base_margin), current_z + base_margin]
+        
+        # Additional check: if current position would be near edges, expand range
+        x_width = x_range[1] - x_range[0]
+        y_width = y_range[1] - y_range[0]
+        z_width = z_range[1] - z_range[0]
+        
+        # Ensure current position is at least 25% away from any edge
+        edge_buffer = 0.25
+        if (current_x - x_range[0]) < x_width * edge_buffer:
+            x_range[0] = current_x - x_width * edge_buffer
+        if (x_range[1] - current_x) < x_width * edge_buffer:
+            x_range[1] = current_x + x_width * edge_buffer
+        if (current_y - y_range[0]) < y_width * edge_buffer:
+            y_range[0] = current_y - y_width * edge_buffer
+        if (y_range[1] - current_y) < y_width * edge_buffer:
+            y_range[1] = current_y + y_width * edge_buffer
+        if (current_z - z_range[0]) < z_width * edge_buffer:
+            z_range[0] = max(0, current_z - z_width * edge_buffer)
+        if (z_range[1] - current_z) < z_width * edge_buffer:
+            z_range[1] = current_z + z_width * edge_buffer
+        
+        # Apply axis limits
         ax.set_xlim(x_range)
         ax.set_ylim(y_range)
         ax.set_zlim(z_range)
         
-        # Update status text
+        # Force axis update and refresh
+        ax.relim()
+        ax.autoscale_view(False, False, False)  # Don't auto-scale, use our limits
+        
+        # Ensure legend is maintained after marker updates
+        try:
+            ax.legend(loc='upper right')
+        except Exception:
+            pass  # Ignore legend errors, not critical
+        
+        # Update status text with debugging information
         if len(time) > 0:
-            current_depth = -z[-1]  # Convert to positive depth
+            current_depth = z[-1]  # Already positive depth
+            current_pitch = self.trajectory_data['pitch'][-1] if self.trajectory_data['pitch'] else 0
+            current_yaw = self.trajectory_data['yaw'][-1] if self.trajectory_data['yaw'] else 0
+            
+            # Add debugging info about axis ranges and marker position
+            marker_visible = (x_range[0] <= current_x <= x_range[1] and 
+                            y_range[0] <= current_y <= y_range[1] and 
+                            z_range[0] <= current_z <= z_range[1])
+            
             status_text = f"""Time: {time[-1]:6.1f}s
 Position: ({x[-1]:6.1f}, {y[-1]:6.1f}, {current_depth:6.1f})m
 Speed: {speed[-1]:5.2f} m/s
-Points: {len(x)}"""
+Pitch: {current_pitch:5.1f}°
+Yaw: {current_yaw:5.1f}°
+Points: {len(x)}
+Marker: {'✓' if marker_visible else '✗'} Visible
+Bounds: X[{x_range[0]:.1f},{x_range[1]:.1f}] Z[{z_range[0]:.1f},{z_range[1]:.1f}]"""
             self.texts['status'].set_text(status_text)
     
     def _update_control_plots(self):
@@ -386,12 +514,20 @@ Points: {len(x)}"""
         # Update heading plot
         self.lines['heading_actual'].set_data(time, self.control_data['heading_actual'])
         self.lines['heading_cmd'].set_data(time, self.control_data['heading_cmd'])
-        self._auto_scale_axis(self.axes['heading'], time,
+        self._auto_scale_axis(self.axes['heading'], time, 
                              [self.control_data['heading_actual'], self.control_data['heading_cmd']])
         
+        # Update pitch plot
+        self.lines['pitch_actual'].set_data(time, self.control_data['pitch_actual'])
+        self.lines['pitch_cmd'].set_data(time, self.control_data['pitch_cmd'])
+        self._auto_scale_axis(self.axes['pitch'], time, 
+                             [self.control_data['pitch_actual'], self.control_data['pitch_cmd']])
+        
         # Update thrust plot
-        self.lines['thrust'].set_data(time, self.control_data['thrust'])
-        self._auto_scale_axis(self.axes['thrust'], time, [self.control_data['thrust']])
+        self.lines['thrust_actual'].set_data(time, self.control_data['thrust_actual'])
+        self.lines['thrust_cmd'].set_data(time, self.control_data['thrust_cmd'])
+        self._auto_scale_axis(self.axes['thrust'], time, 
+                             [self.control_data['thrust_actual'], self.control_data['thrust_cmd']])
     
     def _auto_scale_axis(self, ax, time_data, y_data_lists):
         """Automatically scale axis limits."""

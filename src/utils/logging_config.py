@@ -54,7 +54,7 @@ class SimulationLogger:
     
     def __init__(self, 
                  name: str = "AUV_GNC", 
-                 log_dir: Path = Path("results/logs"),
+                 log_dir: Path = None,
                  log_level: str = "INFO",
                  console_output: bool = True):
         """
@@ -67,6 +67,9 @@ class SimulationLogger:
             console_output: Enable console output
         """
         self.name = name
+        # Use a temp directory if no log_dir provided (for early logger creation)
+        if log_dir is None:
+            log_dir = Path("temp_logs") 
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
         
@@ -196,7 +199,7 @@ class DataLogger:
     and analysis. Data is stored in both CSV and binary formats.
     """
     
-    def __init__(self, log_dir: Path = Path("results/logs"), log_rate: float = 50.0):
+    def __init__(self, log_dir: Path = None, log_rate: float = 50.0):
         """
         Initialize data logger.
         
@@ -204,6 +207,9 @@ class DataLogger:
             log_dir: Directory for data files
             log_rate: Data logging frequency [Hz]
         """
+        # Use a temp directory if no log_dir provided
+        if log_dir is None:
+            log_dir = Path("temp_logs")
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.log_rate = log_rate

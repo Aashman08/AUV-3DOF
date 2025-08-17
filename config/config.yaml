@@ -192,14 +192,14 @@ scenarios:
   logging:
     log_rate: 50.0           # [Hz] Data logging frequency
     save_plots: true         # Save plots automatically
-    show_live_plots: false   # Show live plotting during simulation
-    live_plot_interval: 0.1  # [s] Live plot update interval
+    show_live_plots: true   # Show live plotting during simulation
+    live_plot_interval: 1.0  # [s] Live plot update interval
     live_plot_trail: 500     # Number of points in trajectory trail
     log_level: "INFO"        # Logging level (DEBUG, INFO, WARNING, ERROR)
 
 # File paths and output
 paths:
-  results_dir: "results"     # Results directory
+  results_dir: "results"     # Results directory (relative to project root)
   plots_dir: "results/plots" # Plots directory
   logs_dir: "results/logs"   # Logs directory
   config_dir: "config"       # Configuration directory

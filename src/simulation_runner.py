@@ -41,7 +41,7 @@ class AUVSimulation:
     - Scenario execution and mission planning
     """
     
-    def __init__(self, config_file: str = "config/config.yaml", scenario_name: str = "simulation"):
+    def __init__(self, config_file: str = "../config/config.yaml", scenario_name: str = "simulation"):
         """
         Initialize AUV simulation.
         
@@ -52,8 +52,10 @@ class AUVSimulation:
         # Load configuration
         self.config = self._load_config(config_file)
         
-        # Prepare per-run directories under results/
-        results_root = Path(self.config['paths']['results_dir'])
+        # Prepare per-run directories under results/ (relative to project root)
+        # Get the project root (parent of src directory)
+        project_root = Path(__file__).parent.parent
+        results_root = project_root / self.config['paths']['results_dir']
         results_root.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         # Sanitize scenario name for filesystem use
@@ -114,14 +116,17 @@ class AUVSimulation:
     
     def _load_config(self, config_file: str) -> Dict[str, Any]:
         """Load configuration from YAML file."""
-        config_path = Path(config_file)
+        # Get the project root (parent of src directory)
+        project_root = Path(__file__).parent.parent
+        config_path = project_root / config_file.lstrip('../')
+        
         if not config_path.exists():
-            raise FileNotFoundError(f"Configuration file not found: {config_file}")
+            raise FileNotFoundError(f"Configuration file not found: {config_path}")
         
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
         
-        print(f"Configuration loaded from: {config_file}")
+        print(f"Configuration loaded from: {config_path}")
         return config
     
     def _initialize_components(self):
