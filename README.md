@@ -43,65 +43,110 @@ auv_gnc_simulation/
 │   └── simulation_runner.py           # Main simulation runner
 ├── scenarios/
 │   ├── basic_test.py                  # Basic validation scenario (manual or waypoint mode)
-│   └── waypoint_navigation_test.py    # Dedicated waypoint navigation scenarios
+│   └── waypoint_navigation_test.py    # Dedicated waypoint navigation
 ├── results/
 │   ├── logs/                          # Simulation data logs
 │   └── plots/                         # Generated plots and visualizations
-├── tests/                             # Unit tests
 ├── visualization/                     # Plotting and visualization tools
 │   ├── plot_results.py                # Post-simulation analysis plots
 │   └── live_plot.py                   # Real-time 3D visualization
 ├── test_live_plot.py                  # Live plotting test utility
 ├── generate_plots.py                  # Standalone plot generation utility
 └── README.md                          
+```                
 ```
 
-<details><summary>Project structure</summary>
 
-<!-- (paste the mermaid block here) -->
 ```mermaid
-flowchart TB
+flowchart TD
     A[auv_gnc_simulation/]:::dir
-    A --> C[config/]:::dir
-    C --> C1[config.yaml]:::misc
-    A --> S[src/]:::dir
-    S --> SD[data_types/]:::dir
-    SD --> SD1[types.py]:::py
-    S --> SP[physics/]:::dir
-    SP --> SP1[vehicle_dynamics.py]:::py
-    S --> SA[actuators/]:::dir
-    SA --> SA1[propulsion.py]:::py
-    S --> SS[sensors/]:::dir
-    SS --> SS1[sensor_models.py]:::py
-    S --> SC[control/]:::dir
-    SC --> SC1[pid_controller.py]:::py
-    S --> SN[navigation/]:::dir
-    SN --> SN1[mission_planner.py]:::py
-    SN --> SN2[waypoint_navigator.py]:::py
-    S --> SU[utils/]:::dir
-    SU --> SU1[logging_config.py]:::py
-    S --> SR[simulation_runner.py]:::py
+
+    %% Top-level (vertical)
+    A --> CFG[config/]:::dir
+    A --> SRC[src/]:::dir
     A --> SCN[scenarios/]:::dir
-    SCN --> SCN1[basic_test.py]:::py
-    SCN --> SCN2[waypoint_navigation_test.py]:::py
-    A --> R[results/]:::dir
-    R --> RL[logs/]:::dir
-    R --> RP[plots/]:::dir
-    A --> T[tests/]:::dir
-    A --> V[visualization/]:::dir
-    V --> V1[plot_results.py]:::py
-    V --> V2[live_plot.py]:::py
-    A --> TP[test_live_plot.py]:::py
-    A --> GP[generate_plots.py]:::py
+    A --> RES[results/]:::dir
+    A --> VIS[visualization/]:::dir
+    A --> TLPY[test_live_plot.py]:::py
+    A --> GPY[generate_plots.py]:::py
     A --> RD[README.md]:::md
+
+    %% config/
+    subgraph CONFIG[config/]
+    direction TB
+        C1[config.yaml]:::misc
+    end
+    CFG --> CONFIG
+
+    %% src/
+    subgraph SRCG[src/]
+    direction TB
+        subgraph DT[data_types/]
+        direction TB
+            DT1[types.py]:::py
+        end
+
+        subgraph PH[physics/]
+        direction TB
+            PH1[vehicle_dynamics.py]:::py
+        end
+
+        subgraph AC[actuators/]
+        direction TB
+            AC1[propulsion.py]:::py
+        end
+
+        subgraph SE[sensors/]
+        direction TB
+            SE1[sensor_models.py]:::py
+        end
+
+        subgraph CT[control/]
+        direction TB
+            CT1[pid_controller.py]:::py
+        end
+
+        subgraph NV[navigation/]
+        direction TB
+            NV1[mission_planner.py]:::py -.-> NV2[waypoint_navigator.py]:::py
+        end
+
+        subgraph UT[utils/]
+        direction TB
+            UT1[logging_config.py]:::py
+        end
+
+        SR[simulation_runner.py]:::py
+    end
+    SRC --> SRCG
+
+    %% scenarios/
+    subgraph SCEN[scenarios/]
+    direction TB
+        S1[basic_test.py]:::py -.-> S2[waypoint_navigation_test.py]:::py
+    end
+    SCN --> SCEN
+
+    %% results/
+    subgraph RSLT[results/]
+    direction TB
+        RL[logs/]:::dir -.-> RP[plots/]:::dir
+    end
+    RES --> RSLT
+
+    %% visualization/
+    subgraph VIZ[visualization/]
+    direction TB
+        V1[plot_results.py]:::py -.-> V2[live_plot.py]:::py
+    end
+    VIS --> VIZ
 
     classDef dir fill:#e7f1ff,stroke:#5989d6,stroke-width:1px,color:#000000;
     classDef py  fill:#e9ffe7,stroke:#5fb760,stroke-width:1px,color:#000000;
     classDef md  fill:#fff7cc,stroke:#d6b65a,stroke-width:1px,color:#000000;
     classDef misc fill:#f3f3f3,stroke:#bdbdbd,stroke-width:1px,color:#000000;
-```
 
-</details>
+```
 
 
 ## Configuration
