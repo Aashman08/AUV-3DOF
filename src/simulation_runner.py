@@ -20,6 +20,12 @@ from typing import Dict, Any
 from datetime import datetime
 import sys
 
+# Optimize matplotlib for performance
+import matplotlib
+matplotlib.use('TkAgg')  # Use fast backend
+import matplotlib.pyplot as plt
+# plt.ioff()  # Turn off interactive mode for speed
+
 # Add src to path for imports
 sys.path.append(str(Path(__file__).parent))
 
@@ -92,6 +98,10 @@ class AUVSimulation:
         self.control_dt = self.config['control']['control_dt']    # [s] Control timestep  
         self.current_time = 0.0
         self.step_count = 0
+        
+        # Live plotting timing
+        self.last_plot_time = 0.0
+        self.plot_interval = self.config['scenarios']['logging'].get('live_plot_interval', 1.0)
         
         self.logger.info("AUV simulation initialized successfully")
     
@@ -189,6 +199,7 @@ class AUVSimulation:
         # Reset simulation state
         self.current_time = 0.0
         self.step_count = 0
+        self.last_plot_time = 0.0
         
         # Reset all components
         self.controller.reset()
@@ -264,11 +275,13 @@ class AUVSimulation:
             )
             
             # === LIVE PLOTTING ===
-            if self.live_plotter and self.step_count % 10 == 0:  # Update every 10 steps (25ms at 400Hz)
+            if (self.live_plotter and 
+                self.current_time - self.last_plot_time >= self.plot_interval):
                 self.live_plotter.update_data(
                     self.current_time, self.vehicle_state, sensor_data,
                     current_command, actuator_commands, actual_thrust
                 )
+                self.last_plot_time = self.current_time
             
             # === PROGRESS LOGGING ===
             if self.step_count % 200 == 0:  # Every 0.5 seconds at 400Hz
@@ -281,11 +294,11 @@ class AUVSimulation:
             self.current_time += self.physics_dt
             self.step_count += 1
             
-            # Performance monitoring
+            # Performance monitoring (optional - can disable warnings for non-real-time use)
             step_time = self.logger.end_timer("simulation_step", log_result=False)
-            if step_time > 2 * self.physics_dt:  # Warn if running slow
-                self.logger.warning(f"Simulation step took {step_time:.6f}s "
-                                   f"(target: {self.physics_dt:.6f}s)")
+            # if step_time > 2 * self.physics_dt:  # Warn if running slow
+            #     self.logger.warning(f"Simulation step took {step_time:.6f}s "
+            #                        f"(target: {self.physics_dt:.6f}s)")
         
         # === SIMULATION COMPLETE ===
         self.logger.info(f"Simulation completed: {self.step_count} steps, "

@@ -240,13 +240,12 @@ class AUVResultsPlotter:
         ax.legend()
         ax.grid(True, alpha=0.3)
         
-        # Pitch control
+        # Pitch control (automatic depth control response)
         ax = axes[1, 0]
         ax.plot(time, self.data['pitch'], 'b-', linewidth=2, label='Actual Pitch')
-        ax.plot(time, self.data['pitch_setpoint'], 'r--', linewidth=2, label='Pitch Setpoint')
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Pitch [deg]')
-        ax.set_title('Pitch Control Performance')
+        ax.set_title('Pitch (Auto Depth Control)')
         ax.legend()
         ax.grid(True, alpha=0.3)
         

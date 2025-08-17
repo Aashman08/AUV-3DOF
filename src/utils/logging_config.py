@@ -235,7 +235,7 @@ class DataLogger:
             "time", "x", "y", "z", "roll", "pitch", "yaw",
             "u", "v", "w", "p", "q", "r",
             "thrust_cmd", "fin1_cmd", "fin2_cmd", "fin3_cmd", "fin4_cmd",
-            "speed_setpoint", "heading_setpoint", "pitch_setpoint", "depth_setpoint",
+            "speed_setpoint", "heading_setpoint", "depth_setpoint",
             "imu_ax", "imu_ay", "imu_az", "imu_gx", "imu_gy", "imu_gz",
             "dvl_u", "dvl_v", "dvl_w", "depth_sensor", "mag_heading"
         ]
@@ -287,7 +287,6 @@ class DataLogger:
             f"{actuators.fin_commands[3]:.3f}",
             f"{commands.desired_speed:.3f}",
             f"{commands.desired_heading:.3f}",
-            f"{commands.desired_pitch:.3f}",
             f"{commands.desired_depth:.3f}",
             f"{sensors.imu_accel_xyz[0]:.6f}",
             f"{sensors.imu_accel_xyz[1]:.6f}",

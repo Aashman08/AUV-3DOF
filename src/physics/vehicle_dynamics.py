@@ -274,12 +274,9 @@ class VehicleDynamics:
         return new_state
     
     def _wrap_angle(self, angle: float) -> float:
-        """Wrap angle to [-π, π] range."""
-        while angle > np.pi:
-            angle -= 2 * np.pi
-        while angle < -np.pi:
-            angle += 2 * np.pi
-        return angle
+        """Wrap angle to [-π, π] range with proper handling of edge cases."""
+        # Use atan2 for robust angle wrapping
+        return np.arctan2(np.sin(angle), np.cos(angle))
     
     def get_dynamic_pressure(self, velocity: float) -> float:
         """Calculate dynamic pressure: q = 0.5 * ρ * V²"""

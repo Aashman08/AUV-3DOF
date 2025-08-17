@@ -263,8 +263,10 @@ class MagnetometerSensor:
         noise = np.random.normal(0, self.heading_noise_std)
         measured_heading = true_heading + self.declination + noise
         
-        # Wrap to [0, 360) degrees
-        measured_heading = measured_heading % 360.0
+        # Wrap to [-180, 180] degrees using robust method
+        measured_heading_rad = np.deg2rad(measured_heading)
+        wrapped_rad = np.arctan2(np.sin(measured_heading_rad), np.cos(measured_heading_rad))
+        measured_heading = np.rad2deg(wrapped_rad)
         
         self.last_time = time
         

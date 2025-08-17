@@ -73,7 +73,6 @@ class LiveAUVPlotter:
             'heading_actual': deque(maxlen=trail_length),
             'heading_cmd': deque(maxlen=trail_length),
             'pitch_actual': deque(maxlen=trail_length),
-            'pitch_cmd': deque(maxlen=trail_length),
             'thrust_actual': deque(maxlen=trail_length),
             'thrust_cmd': deque(maxlen=trail_length)
         }
@@ -173,7 +172,7 @@ class LiveAUVPlotter:
         self.control_data['heading_actual'].append(np.degrees(vehicle_state.orientation[2]))
         self.control_data['heading_cmd'].append(commands.desired_heading)
         self.control_data['pitch_actual'].append(np.degrees(vehicle_state.orientation[1]))
-        self.control_data['pitch_cmd'].append(commands.desired_pitch)
+
         # Thrust control: commanded vs actual
         self.control_data['thrust_cmd'].append(actuators.thrust_command)  # What controller commanded
         # Use actual thrust if provided, otherwise fall back to commanded (for backward compatibility)
@@ -298,10 +297,10 @@ class LiveAUVPlotter:
         # Pitch control
         ax = self.axes['pitch']
         self.lines['pitch_actual'], = ax.plot([], [], 'b-', linewidth=2, label='Actual Pitch')
-        self.lines['pitch_cmd'], = ax.plot([], [], 'r--', linewidth=2, label='Target Pitch')
+
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Pitch [deg]')
-        ax.set_title('Pitch Control')
+        ax.set_title('Pitch (Auto Depth Control)')
         ax.legend()
         ax.grid(True, alpha=0.3)
         
@@ -521,9 +520,8 @@ Bounds: X[{x_range[0]:.1f},{x_range[1]:.1f}] Z[{z_range[0]:.1f},{z_range[1]:.1f}
         
         # Update pitch plot
         self.lines['pitch_actual'].set_data(time, self.control_data['pitch_actual'])
-        self.lines['pitch_cmd'].set_data(time, self.control_data['pitch_cmd'])
         self._auto_scale_axis(self.axes['pitch'], time, 
-                             [self.control_data['pitch_actual'], self.control_data['pitch_cmd']])
+                             [self.control_data['pitch_actual']])
         
         # Update thrust plot
         self.lines['thrust_actual'].set_data(time, self.control_data['thrust_actual'])

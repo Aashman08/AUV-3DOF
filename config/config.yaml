@@ -135,7 +135,7 @@ sensors:
 # Control System Parameters
 control:
   # Simulation timing
-  physics_dt: 0.02      # [s] Physics integration timestep (400 Hz)
+  physics_dt: 0.0025    # [s] Physics integration timestep (400 Hz)
   control_dt: 0.02         # [s] Control loop timestep (50 Hz)
   
   # Speed Controller (PI)
@@ -184,7 +184,7 @@ scenarios:
   # Test scenario parameters
   test_duration: 300.0       # [s] Default test duration
   initial_conditions:
-    position: [0.0, 0.0, -5.0]  # [m] Initial X, Y, Z position
+    position: [0.0, 0.0, 0.0]  # [m] Initial X, Y, Z position
     orientation: [0.0, 0.0, 0.0]  # [deg] Initial roll, pitch, yaw
     velocity: [0.0, 0.0, 0.0]   # [m/s] Initial body velocities
     
@@ -194,7 +194,7 @@ scenarios:
     save_plots: true         # Save plots automatically
     show_live_plots: true   # Show live plotting during simulation
     live_plot_interval: 1.0  # [s] Live plot update interval
-    live_plot_trail: 500     # Number of points in trajectory trail
+    live_plot_trail: 200     # Number of points in trajectory trail
     log_level: "INFO"        # Logging level (DEBUG, INFO, WARNING, ERROR)
 
 # File paths and output

@@ -70,7 +70,7 @@ class CommandIn:
         timestamp: Command timestamp in seconds
         desired_speed: Target forward speed [m/s]
         desired_heading: Target heading [deg] (0=North, 90=East)  
-        desired_pitch: Target pitch angle [deg] (positive nose up)
+        desired_pitch: Target pitch angle [deg] (rarely used - typically 0 for depth control)
         desired_depth: Target depth [m] (positive down)
         thrust_override: Manual thrust override [N] (None for auto)
         emergency_surface: Emergency surface command
