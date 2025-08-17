@@ -20,7 +20,7 @@ This simulation provides a realistic physics-based model of an AUV with complete
 
 ## Repository Structure
 
-```
+```bash
 auv_gnc_simulation/
 ├── config/
 │   └── config.yaml                    # Main configuration file
