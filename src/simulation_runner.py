@@ -267,7 +267,7 @@ class AUVSimulation:
             if self.live_plotter and self.step_count % 10 == 0:  # Update every 10 steps (25ms at 400Hz)
                 self.live_plotter.update_data(
                     self.current_time, self.vehicle_state, sensor_data,
-                    current_command, actuator_commands
+                    current_command, actuator_commands, actual_thrust
                 )
             
             # === PROGRESS LOGGING ===

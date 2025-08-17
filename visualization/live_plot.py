@@ -138,7 +138,8 @@ class LiveAUVPlotter:
         print("Live plotter stopped")
     
     def update_data(self, time: float, vehicle_state: VehicleState, 
-                   sensors: SensorsIn, commands: CommandIn, actuators: ActuatorOut):
+                   sensors: SensorsIn, commands: CommandIn, actuators: ActuatorOut,
+                   actual_thrust: float = None):
         """
         Update visualization data and refresh plots if needed.
         
@@ -148,6 +149,7 @@ class LiveAUVPlotter:
             sensors: Current sensor measurements
             commands: Current commands
             actuators: Current actuator outputs
+            actual_thrust: Actual thrust produced by propulsion system [N]
         """
         if not self.is_running:
             return
@@ -172,11 +174,11 @@ class LiveAUVPlotter:
         self.control_data['heading_cmd'].append(commands.desired_heading)
         self.control_data['pitch_actual'].append(np.degrees(vehicle_state.orientation[1]))
         self.control_data['pitch_cmd'].append(commands.desired_pitch)
-        # For thrust, we can show commanded vs actual if thrust dynamics are modeled
-        # actuators.thrust_command is what the controller commanded
-        # The actual thrust would come from propulsion system dynamics (if implemented)
-        self.control_data['thrust_cmd'].append(actuators.thrust_command)
-        self.control_data['thrust_actual'].append(actuators.thrust_command)  # Could be different with thrust lag/dynamics
+        # Thrust control: commanded vs actual
+        self.control_data['thrust_cmd'].append(actuators.thrust_command)  # What controller commanded
+        # Use actual thrust if provided, otherwise fall back to commanded (for backward compatibility)
+        thrust_actual_value = actual_thrust if actual_thrust is not None else actuators.thrust_command
+        self.control_data['thrust_actual'].append(thrust_actual_value)
         
         # Update plots if enough time has passed
         if time - self.last_plot_time >= self.update_interval:
@@ -552,17 +554,26 @@ Bounds: X[{x_range[0]:.1f},{x_range[1]:.1f}] Z[{z_range[0]:.1f},{z_range[1]:.1f}
     
     def save_final_plots(self, output_dir: Path):
         """Save final plots to file."""
-        if not self.fig:
+        if not (self.fig_3d or self.fig_controls):
             return
         
         output_dir.mkdir(parents=True, exist_ok=True)
         
         try:
-            final_plot_file = output_dir / "live_simulation_final.png"
-            self.fig.savefig(final_plot_file, dpi=300, bbox_inches='tight')
-            print(f"Saved final live plot: {final_plot_file}")
+            # Save 3D trajectory plot
+            if self.fig_3d:
+                trajectory_plot_file = output_dir / "live_3d_trajectory_final.png"
+                self.fig_3d.savefig(trajectory_plot_file, dpi=300, bbox_inches='tight')
+                print(f"Saved final 3D trajectory plot: {trajectory_plot_file}")
+            
+            # Save control performance plots
+            if self.fig_controls:
+                controls_plot_file = output_dir / "live_controls_final.png"
+                self.fig_controls.savefig(controls_plot_file, dpi=300, bbox_inches='tight')
+                print(f"Saved final control plots: {controls_plot_file}")
+                
         except Exception as e:
-            print(f"Failed to save final live plot: {e}")
+            print(f"Failed to save final live plots: {e}")
 
 
 # Convenience function for easy integration
