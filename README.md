@@ -23,37 +23,37 @@ This simulation provides a realistic physics-based model of an AUV with complete
 ```
 auv_gnc_simulation/
 ├── config/
-│   └── config.yaml              # Main configuration file
+│   └── config.yaml                    # Main configuration file
 ├── src/
 │   ├── data_types/
-│   │   └── types.py            # Core data structures and helpers
+│   │   └── types.py                   # Core data structures and helpers
 │   ├── physics/
-│   │   └── vehicle_dynamics.py # 3-DOF vehicle physics model
+│   │   └── vehicle_dynamics.py        # 3-DOF vehicle physics model
 │   ├── actuators/
-│   │   └── propulsion.py       # Thruster and propulsion models
+│   │   └── propulsion.py              # Thruster and propulsion models
 │   ├── sensors/
-│   │   └── sensor_models.py    # Complete sensor suite models
+│   │   └── sensor_models.py           # Complete sensor suite models
 │   ├── control/
-│   │   └── pid_controller.py   # PID controllers and control allocation
+│   │   └── pid_controller.py          # PID controllers and control allocation
 │   ├── navigation/
-│   │   ├── mission_planner.py  # Mission generation (grid/perimeter/etc.)
-│   │   └── waypoint_navigator.py # Geographic waypoint navigation
+│   │   ├── mission_planner.py         # Mission generation (grid/perimeter/etc.)
+│   │   └── waypoint_navigator.py      # Geographic waypoint navigation
 │   ├── utils/
-│   │   └── logging_config.py   # Logging and data capture
-│   └── simulation_runner.py    # Main simulation runner
+│   │   └── logging_config.py          # Logging and data capture
+│   └── simulation_runner.py           # Main simulation runner
 ├── scenarios/
-│   ├── basic_test.py           # Basic validation scenario (manual or waypoint mode)
-│   └── waypoint_navigation_test.py # Dedicated waypoint navigation scenarios
+│   ├── basic_test.py                  # Basic validation scenario (manual or waypoint mode)
+│   └── waypoint_navigation_test.py    # Dedicated waypoint navigation scenarios
 ├── results/
-│   ├── logs/                   # Simulation data logs
-│   └── plots/                  # Generated plots and visualizations
-├── tests/                      # Unit tests
-├── visualization/              # Plotting and visualization tools
-│   ├── plot_results.py        # Post-simulation analysis plots
-│   └── live_plot.py           # Real-time 3D visualization
-├── test_live_plot.py          # Live plotting test utility
-├── generate_plots.py          # Standalone plot generation utility
-└── README.md                   # This file
+│   ├── logs/                          # Simulation data logs
+│   └── plots/                         # Generated plots and visualizations
+├── tests/                             # Unit tests
+├── visualization/                     # Plotting and visualization tools
+│   ├── plot_results.py                # Post-simulation analysis plots
+│   └── live_plot.py                   # Real-time 3D visualization
+├── test_live_plot.py                  # Live plotting test utility
+├── generate_plots.py                  # Standalone plot generation utility
+└── README.md                          
 ```
 
 ## Configuration
