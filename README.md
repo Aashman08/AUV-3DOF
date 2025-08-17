@@ -54,8 +54,6 @@ auv_gnc_simulation/
 ├── generate_plots.py                  # Standalone plot generation utility
 └── README.md                          
 ```                
-```
-
 
 ```mermaid
 flowchart TD
