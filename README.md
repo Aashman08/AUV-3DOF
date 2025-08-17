@@ -146,7 +146,6 @@ flowchart TD
 
 ```
 
-
 ## Configuration
 
 The system is configured through `config/config.yaml` which includes:
