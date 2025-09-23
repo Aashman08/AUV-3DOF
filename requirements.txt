@@ -1,0 +1,16 @@
+# AUV GNC Simulation Requirements
+# Core dependencies for AUV simulation framework
+
+# Numerical computing
+numpy>=1.19.0
+
+# Configuration file handling
+PyYAML>=5.4.0
+
+# Plotting and visualization
+matplotlib>=3.3.0
+
+# Optional: Data analysis (for advanced examples)
+# pandas>=1.2.0
+
+# Note: pathlib and datetime are part of Python standard library (3.8+)

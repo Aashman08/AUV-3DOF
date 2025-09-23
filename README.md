@@ -6,6 +6,97 @@ A comprehensive 3-DOF Autonomous Underwater Vehicle (AUV) Guidance, Navigation, 
 
 This simulation provides a realistic physics-based model of an AUV with complete sensor suite, control system, and mission planning capabilities. The system is designed for testing control algorithms, mission planning, and vehicle performance analysis.
 
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [System Architecture](#system-architecture)
+- [API Reference](#api-reference)
+- [Configuration](#configuration)
+- [Development Guide](#development-guide)
+- [Examples](#examples)
+- [Troubleshooting](#troubleshooting)
+- [Technical Specifications](#technical-specifications)
+- [Contributing](#contributing)
+
+## Prerequisites
+
+Before getting started, ensure you have:
+
+- **Python 3.8 or higher** (tested with Python 3.8-3.11)
+- **Git** for version control
+- **4GB+ RAM** (recommended for live plotting)
+- **Operating System**: Windows 10+, macOS 10.14+, or Linux
+
+### Required Python Packages
+All dependencies are automatically installed via `requirements.txt`:
+- NumPy (≥1.19.0) - Numerical computations
+- PyYAML (≥5.4.0) - Configuration file parsing
+- Matplotlib (≥3.3.0) - Plotting and visualization
+- Pathlib - File system operations (standard library)
+- Datetime - Time handling (standard library)
+
+## Installation
+
+### 1. Clone the Repository
+```bash
+git clone <repository-url>
+cd auv_gnc_simulation
+```
+
+### 2. Create Virtual Environment (Recommended)
+```bash
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+# On Linux/macOS:
+source venv/bin/activate
+# On Windows:
+venv\Scripts\activate
+```
+
+### 3. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Verify Installation
+```bash
+# Run basic test to verify everything works
+python scenarios/basic_test.py
+
+# You should see output like:
+# ============================================================
+# AUV BASIC TEST SCENARIO (MANUAL COMMAND)
+# ============================================================
+# Initializing AUV simulation...
+# ...
+# OVERALL RESULT: SUCCESS
+```
+
+### 5. Quick Verification Checklist
+□ No import errors when running basic test  
+□ Simulation completes successfully  
+□ Plots are generated (if enabled)  
+□ No permission errors in results directory  
+
+## Getting Started Checklist
+
+For new users, follow this step-by-step checklist:
+
+1. □ **Install prerequisites** and verify Python version
+2. □ **Clone repository** and set up virtual environment
+3. □ **Install dependencies** using pip
+4. □ **Run basic test scenario** to verify installation
+5. □ **Examine generated plots** in `results/` directory
+6. □ **Try waypoint navigation**: `python scenarios/basic_test.py --waypoint`
+7. □ **Modify configuration** in `config/config.yaml`
+8. □ **Create your first custom scenario**
+9. □ **Explore the codebase** using the architecture guide below
+10. □ **Read development guide** if you plan to contribute
+
 ## Features
 
 - **3-DOF Vehicle Dynamics**: Surge-pitch-yaw model with realistic hydrodynamics
@@ -146,6 +237,179 @@ flowchart TD
 
 ```
 
+## Development Guide
+
+### Understanding the Codebase
+
+#### Project Structure
+```
+src/
+├── data_types/types.py         # 📝 Data structures and interfaces
+├── physics/vehicle_dynamics.py  # ⚙️ Vehicle physics and dynamics
+├── control/pid_controller.py    # 🎯 Control algorithms
+├── sensors/sensor_models.py     # 📶 Sensor simulation
+├── actuators/propulsion.py      # 🚀 Propulsion and actuators
+├── navigation/                  # 🧭 Navigation and guidance
+│   ├── waypoint_navigator.py    # GPS-based navigation
+│   └── mission_planner.py       # Mission generation utilities
+├── utils/logging_config.py      # 📋 Logging and data capture
+└── simulation_runner.py         # 🎦 Main simulation orchestrator
+```
+
+#### Key Design Patterns
+
+1. **Data-Driven Configuration**: All parameters in YAML, no hard-coded values
+2. **Interface Segregation**: Clear data types for component communication
+3. **Immutable Commands**: External interfaces use frozen dataclasses
+4. **Modular Components**: Each subsystem is independently testable
+5. **Coordinate System Separation**: Degrees for I/O, radians for computation
+
+### Adding New Features
+
+#### 1. Adding a New Sensor
+```python
+# In sensor_models.py
+class NewSensor:
+    def __init__(self, config):
+        self.config = config['sensors']['new_sensor']
+    
+    def measure(self, vehicle_state, timestamp):
+        # Implement sensor physics
+        return measurement
+
+# In SensorSuite.measure_all()
+self.new_sensor_data = self.new_sensor.measure(vehicle_state, timestamp)
+```
+
+#### 2. Adding a New Controller
+```python
+# In control/ directory
+class NewController:
+    def __init__(self, config):
+        self.config = config['control']['new_controller']
+    
+    def update(self, command, sensors, dt):
+        # Implement control law
+        return actuator_commands
+
+# Update config.yaml with new parameters
+# Integrate in AUVController class
+```
+
+#### 3. Adding a New Mission Type
+```python
+# In mission_planner.py
+class MissionPlanner:
+    @staticmethod
+    def create_custom_pattern(**kwargs):
+        waypoints = []
+        # Generate waypoint pattern
+        return GeographicMission(waypoints=waypoints, **kwargs)
+```
+
+### Code Style Guidelines
+
+#### Naming Conventions
+- **Classes**: `PascalCase` (e.g., `VehicleDynamics`)
+- **Functions/Variables**: `snake_case` (e.g., `update_controller`)
+- **Constants**: `UPPER_SNAKE_CASE` (e.g., `MAX_DEPTH`)
+- **Private Methods**: `_leading_underscore` (e.g., `_compute_forces`)
+
+#### Documentation Standards
+```python
+def example_function(param1: float, param2: str) -> Tuple[float, bool]:
+    """
+    Brief description of function purpose.
+    
+    Args:
+        param1: Description with units [m/s]
+        param2: Description of string parameter
+        
+    Returns:
+        Tuple of (result_value, success_flag)
+        
+    Raises:
+        ValueError: If param1 is negative
+    """
+    pass
+```
+
+#### Type Hints
+Always use type hints for function signatures:
+```python
+from typing import Dict, List, Optional, Tuple, Any
+import numpy as np
+
+def process_data(data: np.ndarray, config: Dict[str, Any]) -> Optional[List[float]]:
+    pass
+```
+
+### Testing Guidelines
+
+#### Unit Testing
+Create tests for new components:
+```python
+# tests/test_new_component.py
+import unittest
+import numpy as np
+from src.new_module import NewComponent
+
+class TestNewComponent(unittest.TestCase):
+    def setUp(self):
+        self.config = {'test': 'parameters'}
+        self.component = NewComponent(self.config)
+    
+    def test_basic_functionality(self):
+        result = self.component.process(test_input)
+        self.assertAlmostEqual(result, expected_value, places=3)
+```
+
+#### Integration Testing
+Test component interactions:
+```python
+def test_full_simulation_cycle():
+    sim = AUVSimulation("config/config.yaml", "test")
+    mission = [CommandIn(0.0, desired_speed=1.0, desired_heading=0.0, 
+                        desired_pitch=0.0, desired_depth=5.0)]
+    final_state, info = sim.run_scenario(mission, duration=10.0)
+    
+    # Verify reasonable results
+    assert abs(final_state.position[2] + 5.0) < 0.5  # Depth control
+    assert info['steps'] > 100  # Simulation ran
+```
+
+### Performance Optimization
+
+#### Profiling
+```python
+# Add to any function for timing
+from src.utils.logging_config import get_logger
+logger = get_logger()
+
+logger.start_timer("function_name")
+# ... function code ...
+elapsed = logger.end_timer("function_name")
+```
+
+#### Common Optimizations
+1. **Vectorize NumPy operations** instead of loops
+2. **Cache expensive calculations** (coordinate transformations)
+3. **Use appropriate dtypes** (float32 vs float64)
+4. **Minimize object creation** in tight loops
+
+
+#### Physics Instability
+1. **Reduce timestep**: `config['control']['physics_dt'] = 0.001`
+2. **Check force magnitudes**: Look for unrealistic values
+3. **Verify initial conditions**: Start from stable state
+4. **Monitor energy**: Kinetic + potential should be reasonable
+
+#### Control Problems
+1. **Check sensor data**: Are measurements realistic?
+2. **Verify PID gains**: Start with conservative values
+3. **Monitor saturation**: Are actuators hitting limits?
+4. **Check coordinate frames**: Ensure proper transformations
+
 ## Configuration
 
 The system is configured through `config/config.yaml` which includes:
@@ -161,59 +425,185 @@ The system is configured through `config/config.yaml` which includes:
 
 ## Quick Start
 
-1. **Run Basic Test Scenario**:
-   ```bash
-   cd auv_gnc_simulation
-   python scenarios/basic_test.py
-   ```
+### 1. Basic Test Scenario
+```bash
+cd auv_gnc_simulation
+python scenarios/basic_test.py
+```
+**What this does:** Runs a complete AUV mission with diving, turning, and depth changes to validate the entire system.
 
-2. **Run Basic Test with Waypoint Navigation**:
-   ```bash
-   python scenarios/basic_test.py --waypoint
-   ```
+### 2. Waypoint Navigation
+```bash
+python scenarios/basic_test.py --waypoint
+```
+**What this does:** Uses GPS-like waypoint navigation instead of manual commands.
 
-3. **Run Waypoint Navigation Scenarios**:
-   ```bash
-   # Simple, Grid Search, or Perimeter missions
-   python scenarios/waypoint_navigation_test.py --mission simple
-   python scenarios/waypoint_navigation_test.py --mission grid
-   python scenarios/waypoint_navigation_test.py --mission perimeter
+### 3. Mission Types
+```bash
+# Simple point-to-point mission
+python scenarios/waypoint_navigation_test.py --mission simple
 
-   # Or run all
-   python scenarios/waypoint_navigation_test.py --mission all
-   ```
+# Grid search pattern (survey mission)
+python scenarios/waypoint_navigation_test.py --mission grid
 
-4. **Custom Simulation**:
-   ```python
-   from src.simulation_runner import AUVSimulation
-   from src.data_types.types import CommandIn
-   
-   # Create simulation
-   sim = AUVSimulation("config/config.yaml", scenario_name="custom_mission")
-   
-   # Define mission waypoints
-   mission = [
-       CommandIn(0.0, desired_speed=1.0, desired_heading=0.0, 
-                desired_pitch=0.0, desired_depth=5.0),
-       CommandIn(60.0, desired_speed=1.5, desired_heading=90.0,
-                desired_pitch=0.0, desired_depth=5.0)
-   ]
-   
-   # Run simulation with live visualization
-   final_state, info = sim.run_scenario(mission, duration=120.0)
-   ```
+# Perimeter patrol mission
+python scenarios/waypoint_navigation_test.py --mission perimeter
 
-5. **Live Visualization Test**:
-   ```bash
-   python test_live_plot.py
-   ```
+# Run all mission types
+python scenarios/waypoint_navigation_test.py --mission all
+```
 
-6. **Generate Plots from Existing Data**:
-   ```bash
-   python generate_plots.py                    # Latest results
-   python generate_plots.py --show             # Display plots
-   python generate_plots.py --data results/logs/simulation_data_*.csv
-   ```
+### 4. Live Visualization
+```bash
+python test_live_plot.py
+```
+**What this does:** Shows real-time 3D trajectory and control system performance.
+
+### 5. Generate Analysis Plots
+```bash
+python generate_plots.py                    # Latest results
+python generate_plots.py --show             # Display plots
+python generate_plots.py --data results/logs/simulation_data_*.csv
+```
+
+
+## System Architecture
+
+### Overview
+The AUV simulation follows a modular architecture with clear separation of concerns:
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Mission       │    │    Control      │    │   Actuators     │
+│   Planner       │───▶│    System       │───▶│   & Physics     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         ▲                       ▲                       │
+         │                       │                       ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Navigation    │    │     Sensor      │    │   Vehicle       │
+│   System        │◀───│     Suite       │◀───│   Dynamics      │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+### Data Flow
+1. **Mission Planning** → `CommandIn` → **Control System**
+2. **Control System** → `ActuatorOut` → **Propulsion & Fins**
+3. **Vehicle Physics** → `VehicleState` → **Sensor Models**
+4. **Sensor Models** → `SensorsIn` → **Control System**
+5. **All Data** → **Data Logger** → **Visualization**
+
+### Timing Model
+- **Physics Integration**: 400 Hz (0.0025s timestep) for stability
+- **Control Loop**: 50 Hz (0.02s timestep) for realistic response
+- **Sensor Updates**: Variable rates (1-100 Hz) per sensor type
+- **Data Logging**: Configurable (default 50 Hz)
+- **Live Plotting**: 1 Hz (configurable)
+
+### Key Modules
+
+| Module | Purpose | Key Files |
+|--------|---------|----------|
+| **Physics** | Vehicle dynamics, forces, kinematics | `vehicle_dynamics.py` |
+| **Control** | PID controllers, guidance, allocation | `pid_controller.py` |
+| **Sensors** | IMU, DVL, depth, GPS, magnetometer | `sensor_models.py` |
+| **Actuators** | Thrusters, fins, propulsion dynamics | `propulsion.py` |
+| **Navigation** | Waypoint navigation, mission planning | `waypoint_navigator.py`, `mission_planner.py` |
+| **Visualization** | Live plots, post-simulation analysis | `live_plot.py`, `plot_results.py` |
+| **Data Types** | Interfaces, coordinate systems | `types.py` |
+
+## API Reference
+
+### Core Classes
+
+#### `AUVSimulation`
+Main simulation runner that coordinates all subsystems.
+
+```python
+class AUVSimulation:
+    def __init__(self, config_file: str, scenario_name: str)
+    def run_scenario(self, mission_commands: list, duration: float) -> Tuple[VehicleState, Dict]
+    def enable_waypoint_navigation(self, mission: GeographicMission) -> bool
+    def create_simple_mission(self) -> List[CommandIn]
+    def get_simulation_summary(self) -> Dict[str, Any]
+```
+
+**Example:**
+```python
+sim = AUVSimulation("config/config.yaml", "my_mission")
+final_state, info = sim.run_scenario(commands, duration=300.0)
+```
+
+#### `CommandIn` - High-Level Commands
+Represents desired vehicle behavior.
+
+```python
+@dataclass(frozen=True)
+class CommandIn:
+    timestamp: float              # [s] Command time
+    desired_speed: float          # [m/s] Forward speed
+    desired_heading: float        # [deg] 0=North, 90=East
+    desired_pitch: float          # [deg] Nose up positive
+    desired_depth: float          # [m] Positive down
+    thrust_override: Optional[float] = None  # [N] Manual thrust
+    emergency_surface: bool = False
+```
+
+#### `VehicleState` - Complete Vehicle State
+Internal state representation (uses radians).
+
+```python
+@dataclass
+class VehicleState:
+    timestamp: float = 0.0
+    position: np.ndarray         # [m] North, East, Down
+    orientation: np.ndarray      # [rad] Roll, Pitch, Yaw
+    velocity: np.ndarray         # [m/s] Body frame u, v, w
+    angular_velocity: np.ndarray # [rad/s] Body frame p, q, r
+    acceleration: np.ndarray     # [m/s²] Body frame
+    angular_acceleration: np.ndarray # [rad/s²] Body frame
+```
+
+#### `GeographicMission` - Waypoint Navigation
+Defines missions using real-world coordinates.
+
+```python
+@dataclass(frozen=True)
+class GeographicMission:
+    waypoints: List[GeographicWaypoint]
+    mission_name: str = "Untitled Mission"
+    origin_lat: float = 0.0      # [deg] Reference latitude
+    origin_lon: float = 0.0      # [deg] Reference longitude
+    default_speed: float = 1.5   # [m/s]
+```
+
+### Coordinate Systems
+
+| Frame | Description | Usage |
+|-------|-------------|-------|
+| **Global/NED** | North-East-Down, Earth-fixed | Position, waypoints |
+| **Body** | Forward-Right-Down, vehicle-fixed | Velocities, forces |
+| **Geographic** | Latitude-Longitude-Altitude | Mission planning |
+
+### Key Methods
+
+#### Simulation Control
+```python
+# Basic simulation
+sim = AUVSimulation(config_file, scenario_name)
+result = sim.run_scenario(commands, duration)
+
+# Waypoint navigation
+sim.enable_waypoint_navigation(mission)
+status = sim.controller.get_status()
+
+# Mission creation
+from src.navigation.mission_planner import MissionPlanner
+mission = MissionPlanner.create_grid_search(
+    center_lat=37.826, center_lon=-122.423,
+    grid_width=200.0, grid_height=150.0,
+    line_spacing=30.0, depth=8.0
+)
+```
 
 ## Key Components
 
@@ -260,7 +650,7 @@ The system is configured through `config/config.yaml` which includes:
   - Perimeter/area surveys
   - Simple point-to-point routes
   
-Usage example to enable waypoint navigation programmatically:
+**Example: Enable waypoint navigation programmatically**
 ```python
 from src.simulation_runner import AUVSimulation
 from src.navigation.mission_planner import MissionPlanner
@@ -328,6 +718,219 @@ Run with `--mission simple|grid|perimeter|all`. Mission progress and distances a
 - **Units**: SI (meters, kg, seconds, radians internally)
 - **Angles**: Degrees for I/O, radians for computation
 
+## Examples
+
+### Example 1: Hello World
+**Goal**: Simplest possible simulation
+
+```python
+from src.simulation_runner import AUVSimulation
+from src.data_types.types import CommandIn
+
+# Create simulation
+sim = AUVSimulation("config/config.yaml", scenario_name="hello_world")
+
+# Single command: dive and go forward
+mission = [CommandIn(0.0, desired_speed=1.0, desired_heading=0.0, 
+                    desired_pitch=0.0, desired_depth=5.0)]
+
+# Run simulation
+final_state, info = sim.run_scenario(mission, duration=60.0)
+print(f"AUV traveled {np.linalg.norm(final_state.position[:2]):.1f}m")
+```
+
+### Example 2: Parameter Modification
+**Goal**: Change vehicle behavior through configuration
+
+```python
+# Load and modify configuration
+sim = AUVSimulation("config/config.yaml", "custom_vehicle")
+
+# Make vehicle faster and more agile
+sim.config['propulsion']['max_thrust'] = 200.0  # More thrust
+sim.config['control']['yaw_controller']['kp'] = 8.0  # More aggressive turns
+sim.config['vehicle']['mass'] = 70.0  # Lighter vehicle
+
+# Create mission with aggressive maneuvers
+mission = [
+    CommandIn(0.0, desired_speed=0.5, desired_heading=0.0, desired_depth=3.0),
+    CommandIn(20.0, desired_speed=2.5, desired_heading=0.0, desired_depth=3.0),    # Fast
+    CommandIn(40.0, desired_speed=2.5, desired_heading=180.0, desired_depth=3.0),  # Sharp turn
+    CommandIn(60.0, desired_speed=2.5, desired_heading=0.0, desired_depth=8.0),    # Deep dive
+]
+
+final_state, info = sim.run_scenario(mission, duration=120.0)
+```
+
+### Example 3: Geographic Mission
+**Goal**: Real-world GPS-based navigation
+
+```python
+from src.data_types.types import GeographicWaypoint, GeographicMission
+
+# Create simulation
+sim = AUVSimulation("config/config.yaml", "gps_mission")
+
+# Define waypoints using real coordinates (San Francisco Bay)
+waypoints = [
+    GeographicWaypoint(37.7749, -122.4194, depth=5.0, speed=1.5, 
+                       tolerance=10.0, waypoint_id="Start"),
+    GeographicWaypoint(37.7849, -122.4194, depth=8.0, speed=2.0,
+                       tolerance=15.0, waypoint_id="North"),
+    GeographicWaypoint(37.7849, -122.4094, depth=12.0, speed=1.8,
+                       tolerance=12.0, waypoint_id="East"),
+    GeographicWaypoint(37.7749, -122.4094, depth=5.0, speed=1.5,
+                       tolerance=10.0, loiter_time=30.0, waypoint_id="Return")
+]
+
+mission = GeographicMission(
+    waypoints=waypoints,
+    mission_name="San Francisco Bay Survey",
+    origin_lat=37.7749,
+    origin_lon=-122.4194
+)
+
+# Enable waypoint navigation
+sim.enable_waypoint_navigation(mission)
+
+# Run with empty manual commands (navigator controls vehicle)
+final_state, info = sim.run_scenario([], duration=300.0)
+
+# Check mission progress
+status = sim.controller.get_status()
+print(f"Mission complete: {status.get('navigation_status', {}).get('mission_complete', False)}")
+```
+
+### Example 4: Custom Mission Pattern
+**Goal**: Create algorithmic mission patterns
+
+```python
+from src.navigation.mission_planner import MissionPlanner
+import numpy as np
+
+def create_spiral_mission(center_lat, center_lon, radius=100.0, turns=3, depth=10.0):
+    """Create a spiral search pattern."""
+    waypoints = []
+    points_per_turn = 8
+    total_points = turns * points_per_turn
+    
+    for i in range(total_points):
+        angle = 2 * np.pi * i / points_per_turn  # Radians
+        current_radius = radius * (i / total_points)  # Spiral inward
+        
+        # Convert to lat/lon offset (approximate)
+        lat_offset = current_radius * np.cos(angle) / 111000.0  # ~111km per degree
+        lon_offset = current_radius * np.sin(angle) / (111000.0 * np.cos(np.radians(center_lat)))
+        
+        waypoint = GeographicWaypoint(
+            latitude=center_lat + lat_offset,
+            longitude=center_lon + lon_offset,
+            depth=depth,
+            speed=1.5,
+            tolerance=8.0,
+            waypoint_id=f"Spiral_{i}"
+        )
+        waypoints.append(waypoint)
+    
+    return GeographicMission(
+        waypoints=waypoints,
+        mission_name="Spiral Search Pattern",
+        origin_lat=center_lat,
+        origin_lon=center_lon
+    )
+
+# Use custom mission
+sim = AUVSimulation("config/config.yaml", "spiral_search")
+spiral_mission = create_spiral_mission(37.8, -122.4, radius=150.0, turns=2)
+sim.enable_waypoint_navigation(spiral_mission)
+
+final_state, info = sim.run_scenario([], duration=600.0)
+```
+
+
+
+### Simulation Issues
+
+**Problem**: Simulation runs very slowly
+- **Cause**: Live plotting overhead or high logging frequency
+- **Solution**: 
+  ```yaml
+  # In config.yaml
+  scenarios:
+    logging:
+      show_live_plots: false    # Disable live plotting
+      log_rate: 10.0           # Reduce logging frequency
+  ```
+
+**Problem**: Vehicle behavior is unstable
+- **Cause**: Timestep too large or unrealistic parameters
+- **Solution**:
+  ```yaml
+  control:
+    physics_dt: 0.001          # Smaller timestep
+    # And reduce PID gains:
+    yaw_controller:
+      kp: 2.0                  # More conservative
+  ```
+
+**Problem**: Plots are not generated
+- **Cause**: Matplotlib backend issues
+- **Solution**:
+  ```python
+  # Add to simulation script
+  import matplotlib
+  matplotlib.use('Agg')  # Use non-interactive backend
+  ```
+
+**Problem**: Vehicle doesn't reach waypoints
+- **Cause**: Tolerance too small or conflicting speed/depth commands
+- **Solution**:
+  ```python
+  # Increase waypoint tolerance
+  waypoint.tolerance = 15.0  # meters
+  
+  # Or check for reasonable speeds
+  waypoint.speed = 1.5  # Don't exceed ~2.5 m/s
+  ```
+
+### Data Issues
+
+**Problem**: CSV files are empty or corrupted
+- **Cause**: Simulation terminated early or disk space
+- **Solution**: Check disk space and run shorter simulations
+
+**Problem**: Plots show unexpected behavior
+- **Cause**: Unit conversion errors or coordinate frame confusion
+- **Solution**: Check that:
+  - Positions are in meters (not lat/lon)
+  - Angles are in expected units (degrees for display, radians internally)
+  - Time axis starts at 0
+
+### Performance Issues
+
+**Problem**: Memory usage grows during simulation
+- **Cause**: Large logging arrays or memory leaks
+- **Solution**: 
+  ```yaml
+  scenarios:
+    logging:
+      log_rate: 20.0           # Reduce data frequency
+  ```
+
+**Problem**: Real-time factor is too low
+- **Expected**: Real-time factor ≈ 50-100x (simulation faster than real-time)
+- **If < 1x**: Disable live plotting, reduce log rate, check CPU usage
+
+### Common Error Messages
+
+| Error | Likely Cause | Solution |
+|-------|--------------|----------|
+| `"Configuration file not found"` | Wrong working directory | `cd auv_gnc_simulation` |
+| `"Failed to setup live plotter"` | Matplotlib/display issues | Set `show_live_plots: false` |
+| `"Navigation system not enabled"` | Waypoint mission without enabling | Call `sim.enable_waypoint_navigation()` |
+| `"Simulation step took too long"` | Timestep warnings | Increase timestep or disable warnings |
+| `"No data files found for plotting"` | Simulation didn't complete | Check simulation duration and error logs |
+
 ## Dependencies
 
 - Python 3.8+
@@ -337,78 +940,99 @@ Run with `--mission simple|grid|perimeter|all`. Mission progress and distances a
 - Pathlib (standard library)
 - Datetime (standard library)
 
-## Development
 
-### Adding New Scenarios
-1. Create new Python file in `scenarios/`
-2. Import required modules from `src/`
-3. Define mission waypoints using `CommandIn` objects
-4. Use `AUVSimulation` class to run scenario
+### Development Priorities
 
-To use geographic waypoint navigation instead of manual commands:
-1. Create a `GeographicMission` via `MissionPlanner` or manually assemble `GeographicWaypoint` objects
-2. Call `sim.enable_waypoint_navigation(mission)`
-3. Pass an empty list of manual commands to `run_scenario` (navigator will command heading/speed/depth)
+**High Priority**:
+- Bug fixes and stability improvements
+- Performance optimizations
+- Better error handling and validation
+- More comprehensive testing
 
-### Modifying Vehicle Parameters
-1. Edit `config/config.yaml`
-2. Adjust vehicle mass, geometry, or performance parameters
-3. Tune control gains if needed
-4. Validate with test scenarios
+**Medium Priority**:
+- Additional sensor models (USBL, camera, sonar)
+- Advanced control algorithms (MPC, adaptive control)
+- Environmental effects (currents, waves)
+- Multi-vehicle simulation
 
-Relevant configuration groups for guidance/navigation:
-```yaml
-guidance:
-  los:
-    lookahead_distance: 10.0     # [m]
-    capture_radius: 2.0          # [m]
-navigation:
-  look_ahead_distance: 10.0      # [m]
-  waypoint_switch_distance: 5.0  # [m]
-  min_speed: 0.5                 # [m/s]
-  max_speed: 3.0                 # [m/s]
-scenarios:
-  logging:
-    log_rate: 50.0
-    save_plots: true
-    show_live_plots: true
-    live_plot_interval: 1.0
-    live_plot_trail: 200
-```
+**Low Priority**:
+- GUI interface
+- Hardware-in-the-loop integration
+- Real-time plotting improvements
+- Additional visualization options
 
-### Custom Control Algorithms
-1. Implement new controller in `src/control/`
-2. Follow `AUVController` interface pattern
-3. Update `simulation_runner.py` to use new controller
-4. Test with validation scenarios
+### Coding Standards
+
+- **PEP 8** compliance for Python code
+- **Type hints** for all function signatures
+- **Docstrings** for all public methods
+- **Unit tests** for new functionality
+- **Configuration-driven** design (no hard-coded values)
 
 ## Known Limitations
 
-- 3-DOF model (no sway, heave, roll dynamics)
-- Simplified environmental modeling
-- Ideal fin actuator response (no servo dynamics)
-- Basic sensor models (could be enhanced)
-- No obstacle avoidance or collision detection
+**Current Restrictions:**
+- **3-DOF model**: No sway, heave, or roll dynamics (simplified for torpedo-shaped AUVs)
+- **Environmental modeling**: Basic constant currents only
+- **Actuator dynamics**: Ideal fin response (no servo lag or backlash)
+- **Sensor models**: Gaussian noise only (no complex failure modes)
+- **Navigation**: No obstacle avoidance or collision detection
+- **Communication**: No underwater acoustic modeling
+
+**Performance Constraints:**
+- **Real-time factor**: Depends on live plotting and logging settings
+- **Memory usage**: Grows with simulation duration and log frequency
+- **Platform support**: Tested primarily on Linux/macOS, limited Windows testing
+
+**Accuracy Limitations:**
+- **Coordinate systems**: Flat-earth approximation for GPS conversion
+- **Hydrodynamics**: Simplified drag and added-mass models
+- **Environmental effects**: No waves, thermoclines, or variable density
 
 ## Future Enhancements
 
-- 6-DOF full dynamics model
-- Advanced guidance algorithms (LOS, pure pursuit)
-- Underwater communication modeling
-- 3D visualization and plotting
-- Monte Carlo simulation capabilities
-- Hardware-in-the-loop (HIL) integration
+**Planned Features (Short-term)**:
+- Enhanced sensor models with realistic failure modes
+- Improved hydrodynamic coefficients database
+- Better Windows compatibility and testing
+- Configuration validation and error checking
+
+**Research Directions (Long-term)**:
+- **6-DOF dynamics**: Full rigid-body motion model
+- **Advanced guidance**: Model predictive control, adaptive algorithms
+- **Multi-vehicle systems**: Formation control, cooperative missions
+- **Hardware integration**: Real-time interface, hardware-in-the-loop
+- **Machine learning**: Reinforcement learning for control, system identification
+
+**Community Contributions Welcome:**
+- Additional vehicle configurations (gliders, hovering AUVs)
+- Validation against real vehicle data
+- Integration with robotics frameworks (ROS)
+- Educational materials and tutorials
 
 ## References
 
-1. Fossen, T.I. "Handbook of Marine Craft Hydrodynamics and Motion Control" (2011)
-2. REMUS AUV Technical Specifications
-3. Standard Marine Vehicle Notation (SNAME)
+### Technical Literature
+1. **Fossen, T.I.** "Handbook of Marine Craft Hydrodynamics and Motion Control" (2011)
+   - *Primary reference for vehicle dynamics and control theory*
+2. **Prestero, T.** "Verification of a Six-Degree of Freedom Simulation Model for the REMUS Autonomous Underwater Vehicle" (2001)
+   - *REMUS vehicle specifications and validation data*
+3. **Society of Naval Architects and Marine Engineers (SNAME)** "Nomenclature for Treating the Motion of a Submerged Body Through a Fluid" (1950)
+   - *Standard coordinate systems and notation*
+
+### Implementation References
+4. **Caccia, M. et al.** "Modeling and Identification of Open-Frame Variable Configuration Unmanned Underwater Vehicles" (2000)
+   - *Control system design principles*
+5. **Antonelli, G.** "Underwater Robots" (2014)
+   - *Motion control and navigation algorithms*
+6. **Lewis, F.L.** "Control of Robot Manipulators" (1993)
+   - *PID control and stability analysis*
+
+### Software and Tools
+7. **NumPy/SciPy Documentation** - Scientific computing foundation
+8. **Matplotlib Documentation** - Visualization and plotting
+9. **PyYAML Documentation** - Configuration file handling
 
 ## License
 
 MIT License - See LICENSE file for details.
-
-## Contact
-
-For questions or contributions, please create an issue in the repository.
