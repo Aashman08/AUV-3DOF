@@ -380,7 +380,7 @@ class SensorSuite:
             dvl_velocity_xyz=tuple(dvl_meas if dvl_valid else [0.0, 0.0, 0.0]),
             depth=depth_meas,
             magnetometer_heading=heading_meas,
-            attitude_pitch=radians_to_degrees(state.orientation[1]),  # True pitch for simulation
+            attitude_pitch=radians_to_degrees(np.arctan2(np.sin(state.orientation[1]), np.cos(state.orientation[1]))),  # Wrapped pitch
             gps_position_xy=tuple(gps_pos) if gps_valid else None,
             gps_valid=gps_valid
         )

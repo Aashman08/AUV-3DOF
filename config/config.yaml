@@ -1,13 +1,13 @@
 # AUV GNC Simulation Configuration
-# Based on scaled REMUS-class AUV specifications
+# Based on REMUS 620-class UUV specifications
 # Units: SI (meters, kg, seconds, radians) unless noted
 
 # Vehicle Geometry and Mass Properties
 vehicle:
-  # Physical dimensions (scaled from REMUS 100/600 class)
-  length: 2.74          # [m] Total vehicle length
-  diameter: 0.30        # [m] Hull diameter (between REMUS-100 0.19m and REMUS-600 0.324m)
-  mass: 90.0            # [kg] Total vehicle mass in water
+  # Physical dimensions (inspired by REMUS 620 medium-class UUV)
+  length: 3.25          # [m] Total vehicle length (estimated for medium-class)
+  diameter: 0.32        # [m] Hull diameter (medium-class, larger than REMUS-300)
+  mass: 180.0           # [kg] Total vehicle mass in water (estimated for 110hr endurance)
   
   # Center of mass and buoyancy
   cg_offset_x: 0.0      # [m] CG offset from geometric center (forward positive)
@@ -15,37 +15,38 @@ vehicle:
   cb_offset_x: 0.0      # [m] Center of buoyancy offset
   cb_offset_z: 0.0      # [m] CB at geometric center
   
-  # Moments of inertia (estimated from cylinder approximation)
+  # Moments of inertia (estimated from cylinder approximation for REMUS 620 size)
   # I_xx = 0.5 * m * r^2 (roll, small for torpedo shape)
   # I_yy = I_zz = (1/12) * m * L^2 + (1/4) * m * r^2 (pitch/yaw)
-  I_xx: 1.0             # [kg*m^2] Roll inertia (small, minimal for torpedo)
-  I_yy: 50.8            # [kg*m^2] Pitch inertia
-  I_zz: 50.8            # [kg*m^2] Yaw inertia
+  I_xx: 2.3             # [kg*m^2] Roll inertia (0.5 * 180 * 0.16^2)
+  I_yy: 175.6           # [kg*m^2] Pitch inertia ((1/12) * 180 * 3.25^2 + (1/4) * 180 * 0.16^2)
+  I_zz: 175.6           # [kg*m^2] Yaw inertia (same as pitch for torpedo shape)
   
   # Tail arm (distance from CG to fin center of pressure)
-  tail_arm: 1.0         # [m] Lever arm for fin moments
+  tail_arm: 1.2         # [m] Lever arm for fin moments (scaled with length)
 
-# Hydrodynamic Coefficients
+# Hydrodynamic Coefficients (scaled for REMUS 620 class)
 hydrodynamics:
   # Surge (forward motion) drag model: F_drag = d1*u + d2*u*|u|
   d1_surge: 0.0         # [N*s/m] Linear drag coefficient (minimal for streamlined hull)
-  d2_surge: 25.0        # [N*s^2/m^2] Quadratic drag (tuned for ~2.3 m/s top speed)
+  d2_surge: 35.0        # [N*s^2/m^2] Quadratic drag (scaled for larger vehicle, ~4.1 m/s top speed)
   
-  # Added mass coefficients (typical for torpedo-shaped hull)
-  added_mass_surge: 5.0    # [kg] X-direction added mass (~5-10% of vehicle mass)
-  added_mass_sway: 45.0    # [kg] Y-direction added mass (~50% of vehicle mass)
-  added_mass_heave: 45.0   # [kg] Z-direction added mass
+  # Added mass coefficients (typical for torpedo-shaped hull, scaled for size)
+  added_mass_surge: 9.0    # [kg] X-direction added mass (~5% of vehicle mass)
+  added_mass_sway: 90.0    # [kg] Y-direction added mass (~50% of vehicle mass)
+  added_mass_heave: 90.0   # [kg] Z-direction added mass
   
-  # Pitch/yaw damping (moment = -c_q * q, -c_r * r)
-  c_pitch_rate: 15.0    # [N*m*s] Pitch rate damping coefficient
-  c_yaw_rate: 15.0      # [N*m*s] Yaw rate damping coefficient
+  # Roll/pitch/yaw damping (moment = -c_p * p, -c_q * q, -c_r * r) - scaled for larger inertia
+  c_roll_rate: 2.0      # [N*m*s] Roll rate damping coefficient (reduced for stability)
+  c_pitch_rate: 35.0    # [N*m*s] Pitch rate damping coefficient (scaled up)
+  c_yaw_rate: 35.0      # [N*m*s] Yaw rate damping coefficient (scaled up)
 
-# Fin Control Surfaces (X-tail configuration)
+# Fin Control Surfaces (X-tail configuration, scaled for REMUS 620)
 fins:
   # Physical properties
   count: 4              # Number of fins in X-tail configuration
-  area_each: 0.019      # [m^2] Individual fin area (~0.25m span × 0.08m chord)
-  span: 0.25            # [m] Fin span
+  area_each: 0.024      # [m^2] Individual fin area (~0.30m span × 0.08m chord, scaled up)
+  span: 0.30            # [m] Fin span (scaled with diameter)
   chord: 0.08           # [m] Fin chord length
   
   # Dihedral angles for X-tail configuration (±45° from vertical/horizontal)
@@ -63,14 +64,14 @@ fins:
   CD0: 0.02             # [-] Zero-lift drag coefficient
   CDi_factor: 0.8       # [-] Induced drag factor
 
-# Propulsion System
+# Propulsion System (enhanced for REMUS 620 performance)
 propulsion:
-  # Thruster specifications
-  max_thrust: 150.0     # [N] Maximum available thrust
+  # Thruster specifications (scaled for 8 knot capability and larger mass)
+  max_thrust: 200.0     # [N] Maximum available thrust (increased for larger vehicle)
   max_rpm: 3000         # [rpm] Maximum propeller RPM
   
   # Thrust model: T = kt * RPM^2
-  kt_coefficient: 1.67e-5  # [N*s^2] Thrust coefficient (T = kt * RPM^2)
+  kt_coefficient: 2.22e-5  # [N*s^2] Thrust coefficient (T = kt * RPM^2, scaled up)
   
   # Propeller dynamics
   thrust_time_constant: 0.15  # [s] First-order thrust response lag
@@ -153,10 +154,17 @@ control:
     
   # Pitch Controller (PID)
   pitch_controller:
-    kp: 8.0                # [N*m/rad] Proportional gain
-    ki: 0.8                # [N*m/(rad*s)] Integral gain
-    kd: 1.5                # [N*m*s/rad] Derivative gain  
+    kp: 8.0                # [N*m/rad] Proportional gain (reduced for stability)
+    ki: 0.8                # [N*m/(rad*s)] Integral gain (reduced)
+    kd: 1.5                # [N*m*s/rad] Derivative gain (reduced)
     max_integral: 15.0     # [N*m] Integral windup limit
+  
+  # Roll Controller (PID) - for 6-DOF control
+  roll_controller:
+    kp: 1.0                # [N*m/rad] Proportional gain (reduced for stability)
+    ki: 0.1                # [N*m/(rad*s)] Integral gain (very low for torpedo stability)
+    kd: 0.3                # [N*m*s/rad] Derivative gain (reduced)
+    max_integral: 5.0      # [N*m] Integral windup limit
   
   # Safety Limits
   safety:

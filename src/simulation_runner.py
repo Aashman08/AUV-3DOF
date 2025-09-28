@@ -257,6 +257,7 @@ class AUVSimulation:
                 desired_speed=current_command.desired_speed,
                 desired_heading=current_command.desired_heading, 
                 desired_pitch=current_command.desired_pitch,
+                desired_roll=current_command.desired_roll,
                 desired_depth=current_command.desired_depth,
                 thrust_override=current_command.thrust_override,
                 emergency_surface=current_command.emergency_surface
@@ -402,6 +403,7 @@ class AUVSimulation:
             desired_speed=1.0,      # [m/s]
             desired_heading=0.0,    # [deg] North
             desired_pitch=0.0,      # [deg] Level
+            desired_roll=0.0,       # [deg] Level roll
             desired_depth=5.0       # [m] 5m depth
         )
     
@@ -415,27 +417,27 @@ class AUVSimulation:
         missions = [
             # Start: go to depth and stabilize
             CommandIn(0.0, desired_speed=0.5, desired_heading=0.0, 
-                     desired_pitch=0.0, desired_depth=5.0),
+                     desired_pitch=0.0, desired_roll=0.0, desired_depth=5.0),
             
             # Phase 1: straight line at constant depth
             CommandIn(20.0, desired_speed=1.5, desired_heading=0.0,
-                     desired_pitch=0.0, desired_depth=5.0),
+                     desired_pitch=0.0, desired_roll=0.0, desired_depth=5.0),
             
             # Phase 2: turn to East
             CommandIn(60.0, desired_speed=1.5, desired_heading=90.0,
-                     desired_pitch=0.0, desired_depth=5.0),
+                     desired_pitch=0.0, desired_roll=0.0, desired_depth=5.0),
             
             # Phase 3: deeper dive
             CommandIn(100.0, desired_speed=1.0, desired_heading=90.0,
-                     desired_pitch=0.0, desired_depth=10.0),
+                     desired_pitch=0.0, desired_roll=0.0, desired_depth=10.0),
             
             # Phase 4: return to surface heading
             CommandIn(140.0, desired_speed=1.5, desired_heading=180.0,
-                     desired_pitch=0.0, desired_depth=10.0),
+                     desired_pitch=0.0, desired_roll=0.0, desired_depth=10.0),
             
             # Phase 5: surface
             CommandIn(180.0, desired_speed=0.8, desired_heading=180.0,
-                     desired_pitch=0.0, desired_depth=1.0),
+                     desired_pitch=0.0, desired_roll=0.0, desired_depth=1.0),
         ]
         
         self.logger.info(f"Created simple mission with {len(missions)} waypoints")

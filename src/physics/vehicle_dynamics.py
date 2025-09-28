@@ -45,19 +45,21 @@ class HydrodynamicForces:
 
 class VehicleDynamics:
     """
-    3-DOF AUV dynamics model with realistic hydrodynamic effects [[memory:5783612]].
+    6-DOF AUV dynamics model with realistic hydrodynamic effects.
     
     This class implements the core physics simulation for an AUV, including:
     - Surge dynamics with quadratic drag
-    - Pitch and yaw dynamics with fin control
+    - Roll, pitch and yaw dynamics with fin control
     - Kinematic depth calculation
     - Environmental disturbances (currents)
     - Realistic actuator dynamics
     
     State Variables:
     - u: surge velocity [m/s] (forward speed)
+    - φ: roll angle [rad] (starboard down positive)
     - θ: pitch angle [rad] (nose up positive)  
     - ψ: yaw angle [rad] (heading, North=0)
+    - p: roll rate [rad/s]
     - q: pitch rate [rad/s] 
     - r: yaw rate [rad/s]
     - z: depth [m] (positive down)
@@ -77,6 +79,7 @@ class VehicleDynamics:
         self.mass = vehicle_cfg['mass']                    # [kg]
         self.length = vehicle_cfg['length']                # [m] 
         self.diameter = vehicle_cfg['diameter']            # [m]
+        self.I_xx = vehicle_cfg['I_xx']                   # [kg*m²] Roll inertia
         self.I_yy = vehicle_cfg['I_yy']                   # [kg*m²] Pitch inertia
         self.I_zz = vehicle_cfg['I_zz']                   # [kg*m²] Yaw inertia
         self.tail_arm = vehicle_cfg['tail_arm']           # [m] Fin moment arm
@@ -86,6 +89,8 @@ class VehicleDynamics:
         self.d1_surge = hydro_cfg['d1_surge']             # [N*s/m] Linear drag
         self.d2_surge = hydro_cfg['d2_surge']             # [N*s²/m²] Quadratic drag
         self.added_mass_surge = hydro_cfg['added_mass_surge']  # [kg] Added mass
+        self.added_mass_heave = hydro_cfg['added_mass_heave']  # [kg] Z-direction added mass
+        self.c_roll_rate = hydro_cfg.get('c_roll_rate', 5.0)      # [N*m*s] Roll damping
         self.c_pitch_rate = hydro_cfg['c_pitch_rate']     # [N*m*s] Pitch damping
         self.c_yaw_rate = hydro_cfg['c_yaw_rate']         # [N*m*s] Yaw damping
         
@@ -102,6 +107,8 @@ class VehicleDynamics:
         
         # Total mass including added mass effects
         self.total_mass_surge = self.mass + self.added_mass_surge
+        self.total_mass_heave = self.mass + self.added_mass_heave  # Mass for vertical motion
+        self.total_inertia_roll = self.I_xx + hydro_cfg.get('added_inertia_roll', 0.0)
         self.total_inertia_pitch = self.I_yy + hydro_cfg.get('added_inertia_pitch', 0.0)
         self.total_inertia_yaw = self.I_zz + hydro_cfg.get('added_inertia_yaw', 0.0)
         
@@ -146,47 +153,57 @@ class VehicleDynamics:
         # Add propulsion thrust
         forces.surge_force = surge_drag + thrust
         
+        # Get dynamic pressure for fin effectiveness
+        dynamic_pressure = 0.5 * self.fluid_density * u * abs(u)  # q_∞
+        
+        # === ROLL DYNAMICS ===
+        # Roll rate damping: L_p = -c_roll_rate * p
+        roll_damping = -self.c_roll_rate * p
+        
+        # Roll moment from differential fin deflection (simplified X-tail)
+        # Fin configuration: [0=upper-right, 1=upper-left, 2=lower-left, 3=lower-right]
+        # Roll moment comes from differential deflection between left/right pairs
+        roll_lift_moment = dynamic_pressure * self.fin_area * self.CL_delta * self.tail_arm * 0.25 * (
+            (fin_angles[0] + fin_angles[3]) - (fin_angles[1] + fin_angles[2])  # Right - Left
+        )
+        
+        forces.roll_moment = roll_damping + roll_lift_moment
+        
         # === PITCH DYNAMICS ===
         # Pitch rate damping: M_q = -c_pitch_rate * q
         pitch_damping = -self.c_pitch_rate * q
         
-        # Fin control moments (from vertical fins affecting pitch)
-        # For X-tail: fins 1&3 (upper/lower) create pitch moments
-        # Lift force: F_lift = 0.5 * rho * V² * S * CL
-        # Moment: M = F_lift * tail_arm
+        # Pitch moment from upper/lower fin differential (simplified X-tail)
+        pitch_lift_moment = dynamic_pressure * self.fin_area * self.CL_delta * self.tail_arm * 0.5 * (
+            (fin_angles[2] + fin_angles[3]) - (fin_angles[0] + fin_angles[1])  # Lower - Upper
+        )
         
-        dynamic_pressure = 0.5 * self.fluid_density * u * abs(u)  # q_∞
-        
-        # Pitch moment from upper/lower fins (fins 1 and 3 in X-tail)
-        # Assuming X-tail geometry: upper fin creates nose-down moment when deflected positive
-        upper_fin_lift = dynamic_pressure * self.fin_area * self.CL_delta * fin_angles[0]  # Upper fin
-        lower_fin_lift = dynamic_pressure * self.fin_area * self.CL_delta * fin_angles[2]  # Lower fin
-        
-        # Net pitch moment (upper fin creates negative pitch moment, lower creates positive)
-        fin_pitch_moment = self.tail_arm * (-upper_fin_lift + lower_fin_lift)
-        
-        forces.pitch_moment = pitch_damping + fin_pitch_moment
+        forces.pitch_moment = pitch_damping + pitch_lift_moment
         
         # === YAW DYNAMICS ===
         # Yaw rate damping: N_r = -c_yaw_rate * r  
         yaw_damping = -self.c_yaw_rate * r
         
-        # Yaw moment from left/right fins (fins 2 and 4 in X-tail)
-        left_fin_lift = dynamic_pressure * self.fin_area * self.CL_delta * fin_angles[1]   # Left fin
-        right_fin_lift = dynamic_pressure * self.fin_area * self.CL_delta * fin_angles[3]  # Right fin
+        # Yaw moment from left/right fin differential (simplified X-tail)
+        yaw_lift_moment = dynamic_pressure * self.fin_area * self.CL_delta * self.tail_arm * 0.5 * (
+            (fin_angles[1] + fin_angles[2]) - (fin_angles[0] + fin_angles[3])  # Left - Right
+        )
         
-        # Net yaw moment (left fin creates positive yaw moment, right creates negative)
-        fin_yaw_moment = self.tail_arm * (left_fin_lift - right_fin_lift)
-        
-        forces.yaw_moment = yaw_damping + fin_yaw_moment
+        forces.yaw_moment = yaw_damping + yaw_lift_moment
         
         # === ENVIRONMENTAL EFFECTS ===
         # Add current effects (simplified - could be expanded)
         current_surge_effect = -self.d2_surge * environment.current_velocity[0] * abs(environment.current_velocity[0]) * 0.5
         forces.surge_force += current_surge_effect
         
+        # Add buoyancy force for realistic ascent/descent dynamics
+        # Real AUVs have slightly positive buoyancy to assist ascent and save energy
+        # Buoyancy acts as an upward force (negative heave in NED coordinates)
+        buoyancy_force = -self.mass * self.gravity * 0.02  # 2% positive buoyancy [N]
+        forces.heave_force += buoyancy_force
+        
         # Add small restoring moment for pitch stability (simulates metacentric effect)
-        # Real AUVs have slightly positive buoyancy with CG below CB for stability
+        # Real AUVs have CG below CB for stability
         restoring_pitch_moment = -0.5 * self.mass * self.gravity * 0.02 * np.sin(pitch)  # Small restoring
         forces.pitch_moment += restoring_pitch_moment
         
@@ -225,6 +242,14 @@ class VehicleDynamics:
         u_dot = forces.surge_force / self.total_mass_surge
         u_new = u + u_dot * dt
         
+        # === ROLL EQUATION ===
+        # I_xx * dp/dt = L_roll
+        p_dot = forces.roll_moment / self.total_inertia_roll
+        p_new = p + p_dot * dt
+        
+        # Integrate roll angle: dφ/dt = p
+        roll_new = roll + p * dt
+        
         # === PITCH EQUATION ===
         # I_yy * dq/dt = M_pitch  
         q_dot = forces.pitch_moment / self.total_inertia_pitch
@@ -241,12 +266,18 @@ class VehicleDynamics:
         # Integrate yaw angle: dψ/dt = r
         yaw_new = yaw + r * dt
         
-        # === KINEMATIC DEPTH ===
-        # Simplified depth kinematics in NED coordinates (z negative underwater):
-        # - Positive pitch (nose up) → u*sin(+) = positive z_dot → increasing z → going toward surface
-        # - Negative pitch (nose down) → u*sin(-) = negative z_dot → decreasing z → going deeper
-        # This is CORRECT for NED where z=-5 is 5m underwater
-        z_dot = u * np.sin(pitch)
+        # === HEAVE DYNAMICS (Z-direction) ===
+        # Include both kinematic and dynamic effects for realistic vertical motion
+        # Kinematic component: motion due to vehicle pitch attitude
+        kinematic_z_dot = u * np.sin(pitch)
+        
+        # Dynamic component: direct vertical acceleration from heave forces (buoyancy, etc.)
+        # Include buoyancy force effect on vertical motion
+        w_dot = forces.heave_force / self.total_mass_heave  # [m/s²]
+        w_new = w + w_dot * dt  # [m/s] heave velocity
+        
+        # Combined vertical motion: kinematic + dynamic
+        z_dot = kinematic_z_dot + w_new
         z_new = z + z_dot * dt
         
         # === HORIZONTAL POSITION ===
@@ -259,17 +290,19 @@ class VehicleDynamics:
         y_new = y + y_dot * dt
         
         # === UPDATE STATE ===
-        new_state.velocity = np.array([u_new, v, w])  # Only surge changes in 3-DOF model
-        new_state.angular_velocity = np.array([p, q_new, r_new])
-        new_state.orientation = np.array([roll, pitch_new, yaw_new])
+        new_state.velocity = np.array([u_new, v, w_new])  # Surge and heave dynamics active
+        new_state.angular_velocity = np.array([p_new, q_new, r_new])  # All angular rates now active
+        new_state.orientation = np.array([roll_new, pitch_new, yaw_new])  # All angles now active
         new_state.position = np.array([x_new, y_new, z_new])
         
         # Store accelerations for logging/analysis
-        new_state.acceleration = np.array([u_dot, 0.0, z_dot])
-        new_state.angular_acceleration = np.array([0.0, q_dot, r_dot])
+        new_state.acceleration = np.array([u_dot, 0.0, w_dot])  # Include heave acceleration
+        new_state.angular_acceleration = np.array([p_dot, q_dot, r_dot])  # All angular accelerations
         
-        # Enforce angle wrapping for yaw
-        new_state.orientation[2] = self._wrap_angle(new_state.orientation[2])
+        # Enforce angle wrapping for all angles
+        new_state.orientation[0] = self._wrap_angle(new_state.orientation[0])  # Roll
+        new_state.orientation[1] = self._wrap_angle(new_state.orientation[1])  # Pitch  
+        new_state.orientation[2] = self._wrap_angle(new_state.orientation[2])  # Yaw
         
         return new_state
     

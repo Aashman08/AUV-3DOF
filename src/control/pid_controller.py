@@ -193,9 +193,19 @@ class AUVController:
             output_limits=(-30.0, 30.0)  # Moment limits [N*m]
         )
         
+        roll_cfg = control_cfg['roll_controller']
+        self.roll_controller = PIDController(
+            kp=roll_cfg['kp'],
+            ki=roll_cfg['ki'],
+            kd=roll_cfg['kd'],
+            max_integral=roll_cfg['max_integral'],
+            output_limits=(-20.0, 20.0)  # Moment limits [N*m] (smaller for roll)
+        )
+        
         # Depth controller (generates pitch reference)
-        self.depth_kp = 0.05  # [rad/m] Depth error to pitch angle gain (reduced from 0.1)
-        self.max_pitch_for_depth = degrees_to_radians(15.0)  # [rad] Max pitch for depth control
+        self.depth_kp = 0.08  # [rad/m] Depth error to pitch angle gain (baseline)
+        self.depth_kp_ascent = 0.15  # [rad/m] Higher gain for ascent (fighting buoyancy)
+        self.max_pitch_for_depth = degrees_to_radians(20.0)  # [rad] Max pitch for depth control (increased for ascent)
         
         # Fin allocation matrix (maps moments to fin deflections)
         self._setup_fin_allocation(config)
@@ -258,12 +268,12 @@ class AUVController:
             return self.waypoint_navigator.load_mission(mission)
     
     def _setup_fin_allocation(self, config: Dict[str, Any]):
-        """Setup control allocation matrix for X-tail configuration."""
-        # X-tail configuration: 4 fins at ±45° angles
-        # fin 0: upper (creates pitch moment when deflected)
-        # fin 1: left (creates yaw moment when deflected)  
-        # fin 2: lower (creates pitch moment when deflected)
-        # fin 3: right (creates yaw moment when deflected)
+        """Setup control allocation matrix for X-tail configuration with 6-DOF control."""
+        # X-tail configuration: 4 fins at ±45° angles (dihedral angles from config)
+        # fin 0: upper-right (top-right quadrant)
+        # fin 1: upper-left (top-left quadrant)  
+        # fin 2: lower-left (bottom-left quadrant)
+        # fin 3: lower-right (bottom-right quadrant)
         
         fin_cfg = config['fins']
         self.fin_area = fin_cfg['area_each']              # [m²]
@@ -271,11 +281,16 @@ class AUVController:
         self.CL_delta = fin_cfg['CL_delta']               # [1/rad]
         self.max_fin_deflection = degrees_to_radians(fin_cfg['max_deflection'])  # [rad]
         
-        # Allocation matrix: [pitch_moment, yaw_moment] = A * [fin0, fin1, fin2, fin3]
-        # Simplified allocation assuming equal effectiveness
+        # 6-DOF Allocation matrix: [roll_moment, pitch_moment, yaw_moment] = A * [fin0, fin1, fin2, fin3]
+        # Fin configuration: [0=upper-right, 1=upper-left, 2=lower-left, 3=lower-right]
+        # This matrix should match the physics implementation in vehicle_dynamics.py
         self.allocation_matrix = np.array([
-            [-1.0,  0.0,  1.0,  0.0],  # Pitch: upper fin negative, lower positive
-            [ 0.0,  1.0,  0.0, -1.0]   # Yaw: left fin positive, right negative
+            # Roll moments: Right fins - Left fins (0.25 factor applied in dynamics)
+            [ 0.25, -0.25, -0.25,  0.25],  # Roll: (fin0+fin3) - (fin1+fin2)
+            # Pitch moments: Lower fins - Upper fins (0.5 factor applied in dynamics)  
+            [-0.5,  -0.5,   0.5,   0.5],   # Pitch: (fin2+fin3) - (fin0+fin1)
+            # Yaw moments: Left fins - Right fins (0.5 factor applied in dynamics)
+            [-0.5,   0.5,   0.5,  -0.5]    # Yaw: (fin1+fin2) - (fin0+fin3)
         ])
     
     def update(self, commands: CommandIn, sensors: SensorsIn, dt: float, vehicle_state: VehicleState = None) -> ActuatorOut:
@@ -325,7 +340,7 @@ class AUVController:
         current_depth = sensors.depth  # [m] positive down from depth sensor
         depth_error = safe_commands.desired_depth - current_depth  # [m]
         
-        # Simple proportional depth control generating pitch reference
+        # Adaptive proportional depth control generating pitch reference
         # Vehicle dynamics: z_dot = u * sin(pitch) (NED coordinates, z negative underwater)
         # - Positive pitch (nose up) → positive z_dot → increasing z → toward surface (less deep)
         # - Negative pitch (nose down) → negative z_dot → decreasing z → deeper underwater
@@ -333,8 +348,15 @@ class AUVController:
         # Control logic:
         # - Positive depth_error (need deeper) → negative pitch (nose down)
         # - Negative depth_error (need shallower) → positive pitch (nose up)
+        
+        # Use higher gain for ascent (fighting buoyancy is harder than diving)
+        if depth_error < 0:  # Need to ascend (go shallower)
+            effective_kp = self.depth_kp_ascent
+        else:  # Need to descend (go deeper) 
+            effective_kp = self.depth_kp
+            
         pitch_reference = np.clip(
-            -self.depth_kp * depth_error,
+            -effective_kp * depth_error,
             -self.max_pitch_for_depth,
             self.max_pitch_for_depth
         )
@@ -347,8 +369,16 @@ class AUVController:
         # For simulation, use the true attitude measurements
         current_heading = degrees_to_radians(sensors.magnetometer_heading)  # [rad]
         current_pitch = degrees_to_radians(sensors.attitude_pitch)          # [rad]
+        current_roll = vehicle_state.orientation[0] if vehicle_state else 0.0  # [rad] from vehicle state
         
         self.last_update_time = commands.timestamp
+        
+        # Roll control with proper angle wrapping
+        roll_reference = degrees_to_radians(safe_commands.desired_roll)
+        roll_error = self._angle_difference(roll_reference, current_roll)
+        roll_moment = self.roll_controller.update(
+            0.0, -roll_error, dt  # Setpoint=0, error as measurement
+        )
         
         # Heading control
         heading_reference = degrees_to_radians(safe_commands.desired_heading)
@@ -358,15 +388,15 @@ class AUVController:
             0.0, -heading_error, dt  # Setpoint=0, error as measurement
         )
         
-        # Pitch control  
-        pitch_error = pitch_reference - current_pitch
+        # Pitch control with proper angle wrapping
+        pitch_error = self._angle_difference(pitch_reference, current_pitch)
         pitch_moment = self.pitch_controller.update(
             0.0, -pitch_error, dt  # Setpoint=0, error as measurement
         )
         
         # === CONTROL ALLOCATION ===
-        # Map moments to fin deflections
-        moments = np.array([pitch_moment, yaw_moment])  # [N*m]
+        # Map moments to fin deflections (6-DOF control)
+        moments = np.array([roll_moment, pitch_moment, yaw_moment])  # [N*m]
         
         # Simple allocation (could be improved with optimization)
         fin_deflections = self._allocate_fins(moments, current_speed)
@@ -400,6 +430,7 @@ class AUVController:
             desired_pitch=np.clip(commands.desired_pitch, 
                                  -radians_to_degrees(self.max_pitch_angle),
                                  radians_to_degrees(self.max_pitch_angle)),
+            desired_roll=np.clip(commands.desired_roll, -30.0, 30.0),  # Limit roll to ±30°
             desired_depth=max(0.0, commands.desired_depth),  # No negative depth
             thrust_override=commands.thrust_override,
             emergency_surface=commands.emergency_surface
@@ -410,7 +441,7 @@ class AUVController:
         Allocate control moments to fin deflections.
         
         Args:
-            moments: [pitch_moment, yaw_moment] in N*m
+            moments: [roll_moment, pitch_moment, yaw_moment] in N*m
             velocity: Current forward velocity [m/s]
             
         Returns:
@@ -474,6 +505,7 @@ class AUVController:
         self.speed_controller.reset()
         self.heading_controller.reset() 
         self.pitch_controller.reset()
+        self.roll_controller.reset()
         
         # Reset timing state
         self.last_update_time = 0.0
@@ -486,6 +518,7 @@ class AUVController:
             'speed_controller': self.speed_controller.get_state(),
             'heading_controller': self.heading_controller.get_state(),
             'pitch_controller': self.pitch_controller.get_state(),
+            'roll_controller': self.roll_controller.get_state(),
             'navigation_mode': self._navigation_mode,
             'safety_limits': {
                 'max_speed': self.max_speed,

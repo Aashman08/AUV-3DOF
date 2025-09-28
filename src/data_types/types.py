@@ -71,6 +71,7 @@ class CommandIn:
         desired_speed: Target forward speed [m/s]
         desired_heading: Target heading [deg] (0=North, 90=East)  
         desired_pitch: Target pitch angle [deg] (rarely used - typically 0 for depth control)
+        desired_roll: Target roll angle [deg] (0=level, positive=starboard down)
         desired_depth: Target depth [m] (positive down)
         thrust_override: Manual thrust override [N] (None for auto)
         emergency_surface: Emergency surface command
@@ -81,6 +82,7 @@ class CommandIn:
     desired_speed: float        # [m/s] forward speed
     desired_heading: float      # [deg] heading angle  
     desired_pitch: float        # [deg] pitch angle
+    desired_roll: float         # [deg] roll angle (0=level, positive=starboard down)
     desired_depth: float        # [m] depth below surface
     
     # Manual overrides
