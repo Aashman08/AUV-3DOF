@@ -1,17 +1,31 @@
 """
-AUV Vehicle Dynamics - 3-DOF Physics Model
+AUV Vehicle Dynamics - 6-DOF Physics Model
 ===========================================
 
-This module implements the core 3-DOF (surge-pitch-yaw) vehicle dynamics for
-an autonomous underwater vehicle. The physics model is based on established
-marine vehicle dynamics principles and tuned for REMUS-class AUVs.
+This module implements the core 6-DOF (surge, sway, heave, roll, pitch, yaw)
+vehicle dynamics for an autonomous underwater vehicle. The physics model is
+based on established marine vehicle dynamics principles and tuned for
+REMUS-class AUVs.
 
 Physics Implementation [[memory:5554254]]:
-- 3-DOF model: surge velocity (u), pitch angle (θ), yaw angle (ψ)
+- 6-DOF model: full rigid-body motion (u, v, w; p, q, r)
 - Simplified kinematic depth model: ż = u*sin(θ) 
 - First-order thrust dynamics with realistic lag
-- Pitch/yaw dynamics with hydrodynamic damping and fin control
+- Roll/pitch/yaw dynamics with hydrodynamic damping and fin control
 - Environmental effects (currents, buoyancy)
+
+Symbols and Notation:
+- u, v, w: Body-frame linear velocities [m/s] (surge, sway, heave)
+- p, q, r: Body-frame angular rates [rad/s] (roll rate, pitch rate, yaw rate)
+- φ, θ, ψ: Euler angles [rad] (roll, pitch, yaw)
+- x, y, z: NED position [m] (North, East, Down)
+- ρ: Fluid density [kg/m³]
+- q_∞: Dynamic pressure [Pa] = 0.5 · ρ · V · |V| (V typically u)
+- CL, CD: Lift 
+and drag coefficients [-]
+- δ: Fin deflection angle [rad] (per-fin: δ0..δ3)
+- T: Propeller thrust force [N]
+- g: Gravitational acceleration [m/s²]
 
 Reference:
 Fossen, T.I. "Handbook of Marine Craft Hydrodynamics and Motion Control" (2011)

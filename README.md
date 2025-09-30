@@ -1,6 +1,6 @@
 # AUV GNC Simulation
 
-A comprehensive 3-DOF Autonomous Underwater Vehicle (AUV) Guidance, Navigation, and Control simulation based on REMUS-class vehicle specifications.
+A comprehensive 6-DOF Autonomous Underwater Vehicle (AUV) Guidance, Navigation, and Control simulation based on REMUS-class vehicle specifications.
 
 ## Overview
 
@@ -99,7 +99,7 @@ For new users, follow this step-by-step checklist:
 
 ## Features
 
-- **3-DOF Vehicle Dynamics**: Surge-pitch-yaw model with realistic hydrodynamics
+- **6-DOF Vehicle Dynamics**: Full rigid-body model with realistic hydrodynamics
 - **Complete Sensor Suite**: IMU, DVL, depth sensor, magnetometer, GPS
 - **PID Control System**: Speed, heading, pitch, and depth control
 - **Realistic Actuators**: Propulsion system and X-tail fin configuration
@@ -119,7 +119,7 @@ auv_gnc_simulation/
 │   ├── data_types/
 │   │   └── types.py                   # Core data structures and helpers
 │   ├── physics/
-│   │   └── vehicle_dynamics.py        # 3-DOF vehicle physics model
+│   │   └── vehicle_dynamics.py        # 6-DOF vehicle physics model
 │   ├── actuators/
 │   │   └── propulsion.py              # Thruster and propulsion models
 │   ├── sensors/
@@ -608,7 +608,7 @@ mission = MissionPlanner.create_grid_search(
 ## Key Components
 
 ### Vehicle Dynamics (`src/physics/vehicle_dynamics.py`)
-- 3-DOF physics model (surge, pitch, yaw)
+- 6-DOF physics model (surge, sway, heave, roll, pitch, yaw)
 - Hydrodynamic forces and moments
 - Environmental effects (currents, buoyancy)
 - Kinematic depth calculation
@@ -972,7 +972,7 @@ final_state, info = sim.run_scenario([], duration=600.0)
 ## Known Limitations
 
 **Current Restrictions:**
-- **3-DOF model**: No sway, heave, or roll dynamics (simplified for torpedo-shaped AUVs)
+- **6-DOF model**: Full rigid-body dynamics implemented
 - **Environmental modeling**: Basic constant currents only
 - **Actuator dynamics**: Ideal fin response (no servo lag or backlash)
 - **Sensor models**: Gaussian noise only (no complex failure modes)
