@@ -67,15 +67,15 @@ class SimulationLogger:
             console_output: Enable console output
         """
         self.name = name
-        # Use a temp directory if no log_dir provided (for early logger creation)
-        if log_dir is None:
-            log_dir = Path("temp_logs") 
-        self.log_dir = Path(log_dir)
-        self.log_dir.mkdir(parents=True, exist_ok=True)
+        self.log_dir = Path(log_dir) if log_dir is not None else None
+        self.log_file = None
         
-        # Create unique log filename with timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.log_file = self.log_dir / f"{name}_{timestamp}.log"
+        # Create log directory and file only if log_dir is provided
+        if self.log_dir is not None:
+            self.log_dir.mkdir(parents=True, exist_ok=True)
+            # Create unique log filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.log_file = self.log_dir / f"{name}_{timestamp}.log"
         
         # Setup logger
         self.logger = logging.getLogger(name)
@@ -84,13 +84,14 @@ class SimulationLogger:
         # Clear existing handlers
         self.logger.handlers.clear()
         
-        # File handler
-        file_handler = logging.FileHandler(self.log_file)
-        file_formatter = logging.Formatter(
-            '%(asctime)s | %(levelname)-8s | %(name)s | %(funcName)s:%(lineno)d | %(message)s'
-        )
-        file_handler.setFormatter(file_formatter)
-        self.logger.addHandler(file_handler)
+        # File handler (only if log_dir was provided)
+        if self.log_file is not None:
+            file_handler = logging.FileHandler(self.log_file)
+            file_formatter = logging.Formatter(
+                '%(asctime)s | %(levelname)-8s | %(name)s | %(funcName)s:%(lineno)d | %(message)s'
+            )
+            file_handler.setFormatter(file_formatter)
+            self.logger.addHandler(file_handler)
         
         # Console handler (optional)
         if console_output:
@@ -106,7 +107,10 @@ class SimulationLogger:
         self._timers: Dict[str, float] = {}
         self._counters: Dict[str, int] = {}
         
-        self.logger.info(f"Simulation logger initialized: {self.log_file}")
+        if self.log_file is not None:
+            self.logger.info(f"Simulation logger initialized: {self.log_file}")
+        else:
+            self.logger.info(f"Simulation logger initialized (console only)")
     
     def start_timer(self, name: str) -> None:
         """Start a performance timer."""
@@ -207,9 +211,9 @@ class DataLogger:
             log_dir: Directory for data files
             log_rate: Data logging frequency [Hz]
         """
-        # Use a temp directory if no log_dir provided
+        # Require log_dir to be provided for DataLogger
         if log_dir is None:
-            log_dir = Path("temp_logs")
+            raise ValueError("DataLogger requires a log_dir to be specified")
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.log_rate = log_rate
