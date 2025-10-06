@@ -1007,26 +1007,21 @@ yaw_lift_moment = dyn_press * A * CL_delta * L_arm * 0.5 * (
 
 ✗ **Critical simplifications:**
 
-1. **No 3D flow effects:**
-   - Fins assumed independent (no interaction)
-   - No wake effects from forward fins affecting aft fins
-   - No hull-fin interaction
-
-2. **Linear lift assumption:** `L = CL_delta · δ`
+1. **Linear lift assumption:** `L = CL_delta · δ`
    - Reality: Nonlinear stall at high deflection (typically δ > 20-25°)
    - Config limit: 25° → close to stall regime
    - Should use: `CL(δ) = CL_α·sin(δ)·cos(δ)` for better accuracy
 
-3. **No fin-induced drag:**
+2. **No fin-induced drag:**
    - Fins create induced drag proportional to lift²
    - Should add: `D_fin = 0.5·ρ·u²·A·(CD0 + CDi·CL²)`
    - Affects surge force, currently ignored
 
-4. **Speed-squared dependency only:**
+3. **Speed-squared dependency only:**
    - Dynamic pressure `q = 0.5·ρ·u·|u|` correct
    - But no angle-of-attack correction for vehicle pitch/yaw
 
-5. **No servo dynamics:**
+4. **No servo dynamics:**
    - Config specifies `servo_lag: 0.03 s` but **not implemented**
    - Fins respond instantaneously to commands (unrealistic)
 

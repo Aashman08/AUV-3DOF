@@ -202,10 +202,14 @@ class AUVController:
             output_limits=(-20.0, 20.0)  # Moment limits [N*m] (smaller for roll)
         )
         
-        # Depth controller (generates pitch reference)
-        self.depth_kp = 0.08  # [rad/m] Depth error to pitch angle gain (baseline)
-        self.depth_kp_ascent = 0.15  # [rad/m] Higher gain for ascent (fighting buoyancy)
-        self.max_pitch_for_depth = degrees_to_radians(20.0)  # [rad] Max pitch for depth control (increased for ascent)
+        depth_cfg = control_cfg['depth_controller']
+        self.depth_controller = PIDController(
+            kp=depth_cfg['kp'],
+            ki=depth_cfg['ki'],
+            kd=depth_cfg['kd'],
+            max_integral=depth_cfg['max_integral'],
+            output_limits=degrees_to_radians(np.array(depth_cfg['output_limits']))
+        )
         
         # Fin allocation matrix (maps moments to fin deflections)
         self._setup_fin_allocation(config)
@@ -336,32 +340,42 @@ class AUVController:
                 safe_commands.desired_speed, current_speed, dt
             )
         
-        # === DEPTH CONTROL (generates pitch reference) ===
+        # Gain scheduling based on speed (control authority ~ u^2)
+        nominal_speed = 1.5  # [m/s] Reference speed for gain tuning
+        speed_scale = max(0.5, min(2.0, (current_speed / nominal_speed)**2 if current_speed > 0.1 else 0.5))
+        
+        # Temporarily scale attitude controller gains
+        original_gains = {
+            'heading': (self.heading_controller.kp, self.heading_controller.ki, self.heading_controller.kd),
+            'pitch': (self.pitch_controller.kp, self.pitch_controller.ki, self.pitch_controller.kd),
+            'roll': (self.roll_controller.kp, self.roll_controller.ki, self.roll_controller.kd)
+        }
+        
+        self.heading_controller.kp *= speed_scale
+        self.heading_controller.ki *= speed_scale
+        self.heading_controller.kd *= speed_scale
+        
+        self.pitch_controller.kp *= speed_scale
+        self.pitch_controller.ki *= speed_scale
+        self.pitch_controller.kd *= speed_scale
+        
+        self.roll_controller.kp *= speed_scale
+        self.roll_controller.ki *= speed_scale
+        self.roll_controller.kd *= speed_scale
+        
+        # === DEPTH CONTROL (FULL PID generating pitch reference) ===
         current_depth = sensors.depth  # [m] positive down from depth sensor
-        depth_error = safe_commands.desired_depth - current_depth  # [m]
+        pitch_reference = self.depth_controller.update(
+            safe_commands.desired_depth, current_depth, dt
+        )
         
-        # Adaptive proportional depth control generating pitch reference
-        # Vehicle dynamics: z_dot = u * sin(pitch) (NED coordinates, z negative underwater)
-        # - Positive pitch (nose up) → positive z_dot → increasing z → toward surface (less deep)
-        # - Negative pitch (nose down) → negative z_dot → decreasing z → deeper underwater
-        # 
-        # Control logic:
-        # - Positive depth_error (need deeper) → negative pitch (nose down)
-        # - Negative depth_error (need shallower) → positive pitch (nose up)
-        
-        # Use higher gain for ascent (fighting buoyancy is harder than diving)
-        if depth_error < 0:  # Need to ascend (go shallower)
-            effective_kp = self.depth_kp_ascent
-        else:  # Need to descend (go deeper) 
-            effective_kp = self.depth_kp
-            
         pitch_reference = np.clip(
-            -effective_kp * depth_error,
+            pitch_reference,
             -self.max_pitch_for_depth,
             self.max_pitch_for_depth
         )
         
-        # Manual pitch override (rarely used - most missions use depth control)
+        # Manual pitch override
         if abs(safe_commands.desired_pitch) > 1e-3:  # Non-zero pitch command
             pitch_reference = degrees_to_radians(safe_commands.desired_pitch)
         
@@ -412,6 +426,11 @@ class AUVController:
         else:
             thrust_rpm = 0.0
         
+        # Restore original gains after computation
+        self.heading_controller.kp, self.heading_controller.ki, self.heading_controller.kd = original_gains['heading']
+        self.pitch_controller.kp, self.pitch_controller.ki, self.pitch_controller.kd = original_gains['pitch']
+        self.roll_controller.kp, self.roll_controller.ki, self.roll_controller.kd = original_gains['roll']
+
         return ActuatorOut(
             timestamp=commands.timestamp,
             thrust_command=thrust_command,
@@ -506,6 +525,7 @@ class AUVController:
         self.heading_controller.reset() 
         self.pitch_controller.reset()
         self.roll_controller.reset()
+        self.depth_controller.reset() # Reset depth controller
         
         # Reset timing state
         self.last_update_time = 0.0
@@ -519,6 +539,7 @@ class AUVController:
             'heading_controller': self.heading_controller.get_state(),
             'pitch_controller': self.pitch_controller.get_state(),
             'roll_controller': self.roll_controller.get_state(),
+            'depth_controller': self.depth_controller.get_state(), # Add depth controller status
             'navigation_mode': self._navigation_mode,
             'safety_limits': {
                 'max_speed': self.max_speed,

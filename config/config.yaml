@@ -9,12 +9,24 @@ vehicle:
   diameter: 0.32        # [m] Hull diameter (medium-class, larger than REMUS-300)
   mass: 180.0           # [kg] Total vehicle mass in water (estimated for 110hr endurance)
   
-  # Center of mass and buoyancy
-  cg_offset_x: 0.0      # [m] CG offset from geometric center (forward positive)
-  cg_offset_z: -0.02    # [m] CG slightly below centerline for stability
-  cb_offset_x: 0.0      # [m] Center of buoyancy offset
-  cb_offset_z: 0.0      # [m] CB at geometric center
+  # Centers (body frame, origin at geometric center)
+  cg_offset_x: 0.0      # [m] Longitudinal CG position (0 = at center)
+  cg_offset_y: 0.0      # [m] Lateral (should be 0 for symmetric vehicle)
+  cg_offset_z: -0.02    # [m] Vertical (negative = below centerline)
   
+  cb_offset_x: 0.0      # [m] CB longitudinal
+  cb_offset_y: 0.0      # [m] CB lateral
+  cb_offset_z: 0.0      # [m] CB vertical (0 = at geometric center)
+  
+  # Buoyancy specification
+  buoyancy_method: "displaced_volume"  # "displaced_volume" or "buoyancy_fraction"
+  displaced_volume: 0.179  # [m³] Physical volume (if method = displaced_volume)
+  buoyancy_fraction: 1.02  # [-] B/W ratio (if method = buoyancy_fraction)
+  
+  # Alternatively, let config calculate from mass:
+  # V_neutral = mass / fluid_density = 180 / 1025 = 0.1756 m³
+  # V_actual = V_neutral * buoyancy_fraction
+
   # Moments of inertia (estimated from cylinder approximation for REMUS 620 size)
   # I_xx = 0.5 * m * r^2 (roll, small for torpedo shape)
   # I_yy = I_zz = (1/12) * m * L^2 + (1/4) * m * r^2 (pitch/yaw)
@@ -36,7 +48,21 @@ hydrodynamics:
   added_mass_sway: 90.0    # [kg] Y-direction added mass (~50% of vehicle mass)
   added_mass_heave: 90.0   # [kg] Z-direction added mass
   
-  # Roll/pitch/yaw damping (moment = -c_p * p, -c_q * q, -c_r * r) - scaled for larger inertia
+  # NEW: Added inertia for rotational DOFs
+  added_inertia_roll: 0.23      # [kg·m²] ~10% of I_xx (axial, small)
+  added_inertia_pitch: 52.7     # [kg·m²] ~30% of I_yy (lateral, large)
+  added_inertia_yaw: 52.7       # [kg·m²] ~30% of I_zz (lateral, large)
+
+  # NEW: Sway and heave damping (quadratic cross-flow)
+  d2_sway: 120.0                # [N·s²/m²] Higher than surge (bluff body)
+  d2_heave: 120.0               # [N·s²/m²] Same as sway (symmetric)
+
+  # NEW: Quadratic angular damping (for high-rate maneuvers)
+  c_roll_rate_quadratic: 0.5    # [N·m·s²] Small for torpedo
+  c_pitch_rate_quadratic: 10.0  # [N·m·s²]
+  c_yaw_rate_quadratic: 10.0    # [N·m·s²]
+
+  # Existing rotational damping...
   c_roll_rate: 2.0      # [N*m*s] Roll rate damping coefficient (reduced for stability)
   c_pitch_rate: 35.0    # [N*m*s] Pitch rate damping coefficient (scaled up)
   c_yaw_rate: 35.0      # [N*m*s] Yaw rate damping coefficient (scaled up)

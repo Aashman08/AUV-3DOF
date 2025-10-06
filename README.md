@@ -99,15 +99,11 @@ For new users, follow this step-by-step checklist:
 
 ## Features
 
-- **6-DOF Vehicle Dynamics**: Full rigid-body model with realistic hydrodynamics
-- **Complete Sensor Suite**: IMU, DVL, depth sensor, magnetometer, GPS
-- **PID Control System**: Speed, heading, pitch, and depth control
-- **Realistic Actuators**: Propulsion system and X-tail fin configuration
-- **Mission Planning**: Waypoint-based mission execution
-- **Data Logging**: High-frequency data capture with CSV output
-- **Real-time Visualization**: Live 3D trajectory and control monitoring
-- **Automatic Plot Generation**: Comprehensive post-simulation analysis plots
-- **Configurable Parameters**: YAML-based configuration system
+- Full 6-DOF Vehicle Dynamics with Coriolis, added mass, and proper kinematics
+- Complete Sensor Suite with realistic noise models
+- PID Control System with gain scheduling
+- Realistic Actuators with dynamics and limits
+- Mission Planning and Waypoint Navigation
 
 ## Repository Structure
 
@@ -696,6 +692,15 @@ Demonstrates autonomous navigation between geographic waypoints with multiple mi
 - Perimeter/area survey
 
 Run with `--mission simple|grid|perimeter|all`. Mission progress and distances are reported at the end of the run, and plots are generated automatically if enabled.
+
+## Validation and Tests
+A comprehensive validation suite is available in `tests/validation/`.
+- Unit tests for individual components
+- Integration tests for full system
+- Energy conservation checks
+- Comparison with literature (REMUS data)
+
+Run tests with `pytest tests/validation/`
 
 ## Technical Specifications
 
